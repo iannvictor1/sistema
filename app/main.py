@@ -11,6 +11,7 @@ from .schemas import (
     LancamentoSemanalResponse,
     FrequenciaMensalCreate,
     FrequenciaMensalResponse,
+    LancamentoSemanalUpdate
 )
 from .calculos import calcular_bonus, calcular_bonus_mensal
 from .export_excel import exportar_fechamento_excel
@@ -19,6 +20,8 @@ app = FastAPI(title="Sistema de Bonificação")
 
 Base.metadata.create_all(bind=engine)
 
+def formatar_mes_para_semana(mes: str) -> str:
+    return f"{mes[5:7]}/{mes[:4]}"
 
 def get_db():
     db = SessionLocal()
@@ -50,7 +53,8 @@ def criar_funcionario(funcionario: FuncionarioCreate, db: Session = Depends(get_
     novo = Funcionario(
         nome=funcionario.nome,
         cargo=funcionario.cargo,
-        ativo=funcionario.ativo
+        ativo=funcionario.ativo,
+        tipo_entrega=funcionario.tipo_entrega
     )
     db.add(novo)
     db.commit()
@@ -86,7 +90,7 @@ def criar_lancamento_semanal(
         motivo_penalidade = lancamento.motivo_penalidade
 
     bonus = calcular_bonus(
-        cargo=funcionario.cargo,
+        tipo_entrega=funcionario.tipo_entrega,
         pedidos_separados=lancamento.pedidos_separados,
         pedidos_carregados=lancamento.pedidos_carregados,
         toneladas=lancamento.toneladas,
@@ -120,7 +124,78 @@ def criar_lancamento_semanal(
 def listar_lancamentos_semanais(db: Session = Depends(get_db)):
     return db.query(LancamentoSemanal).order_by(LancamentoSemanal.id.desc()).all()
 
+@app.put("/lancamentos-semanais/{lancamento_id}", response_model=LancamentoSemanalResponse)
+def editar_lancamento_semanal(
+    lancamento_id: int,
+    dados: LancamentoSemanalUpdate,
+    db: Session = Depends(get_db)
+):
+    lancamento = (
+        db.query(LancamentoSemanal)
+        .filter(LancamentoSemanal.id == lancamento_id)
+        .first()
+    )
+    
+    if not lancamento:
+        raise HTTPException(status_code=404, detail="Lançamento não encontrado.")
+    
+    funcionario = (
+        db.query(Funcionario)
+        .filter(Funcionario.id == lancamento.funcionario_id)
+        .first()
+    )
+    
+    if not funcionario:
+        raise HTTPException(status_code=404, detail= "Funcionário não encontrado.")
+    
+    if dados.penalidade and not dados.motivo_penalidade:
+        raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
 
+    bonus = calcular_bonus(
+        tipo_entrega=funcionario.tipo_entrega,
+        pedidos_separados=dados.pedidos_separados,
+        pedidos_carregados=dados.pedidos_carregados,
+        toneladas=dados.toneladas,
+        entregas=dados.entregas,
+        retornos=dados.retornos,
+        nota=dados.nota,
+        penalidade=dados.penalidade
+    )
+        
+    lancamento.semana = dados.semana
+    lancamento.pedidos_separados = dados.pedidos_separados
+    lancamento.pedidos_carregados = dados.pedidos_carregados
+    lancamento.toneladas = dados.toneladas
+    lancamento.entregas = dados.entregas
+    lancamento.retornos = dados.retornos
+    lancamento.nota = dados.nota
+    lancamento.penalidade = dados.penalidade
+    lancamento.motivo_penalidade = dados.motivo_penalidade if dados.penalidade else None
+    lancamento.bonus_calculado = bonus
+    
+    db.commit()
+    db.refresh(lancamento)
+    return lancamento
+
+@app.delete("/lancamentos-semanais/{lancamento_id}")
+def excluir_lancamento_semanal(
+    lancamento_id: int,
+    db: Session = Depends(get_db)
+):
+    lancamento = (
+        db.query(LancamentoSemanal)
+        .filter(LancamentoSemanal.id == lancamento_id)
+        .first()
+    )
+    
+    if not lancamento:
+        raise HTTPException(status_code=404, detail="Lançamento não encontrado.")
+    
+    db.delete(lancamento)
+    db.commit()
+    
+    return {"mensagem": "Lançamento excluído com sucesso."}
+        
 @app.post("/frequencias", response_model=FrequenciaMensalResponse)
 def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(get_db)):
     funcionario = (
@@ -168,6 +243,7 @@ def listar_frequencias(db: Session = Depends(get_db)):
 def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
     funcionarios = db.query(Funcionario).order_by(Funcionario.nome).all()
     resultado = []
+    mes_formatado = formatar_mes_para_semana(mes)
 
     for funcionario in funcionarios:
         frequencia = (
@@ -185,7 +261,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             db.query(LancamentoSemanal)
             .filter(
                 LancamentoSemanal.funcionario_id == funcionario.id,
-                LancamentoSemanal.semana.like(f"{mes}%")
+                LancamentoSemanal.semana.like(f"%{mes_formatado}")
             )
             .all()
         )
@@ -211,6 +287,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
 @app.get("/exportar-fechamento/{mes}")
 def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
     funcionarios = db.query(Funcionario).order_by(Funcionario.nome).all()
+    mes_formatado = formatar_mes_para_semana(mes)
 
     fechamento = []
     for funcionario in funcionarios:
@@ -229,7 +306,7 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
             db.query(LancamentoSemanal)
             .filter(
                 LancamentoSemanal.funcionario_id == funcionario.id,
-                LancamentoSemanal.semana.like(f"{mes}%")
+                LancamentoSemanal.semana.like(f"%{mes_formatado}")
             )
             .all()
         )
@@ -251,7 +328,7 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
 
     todos_lancamentos = (
         db.query(LancamentoSemanal)
-        .filter(LancamentoSemanal.semana.like(f"{mes}%"))
+        .filter(LancamentoSemanal.semana.like(f"%{mes_formatado}"))
         .order_by(LancamentoSemanal.id.desc())
         .all()
     )

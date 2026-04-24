@@ -9,6 +9,7 @@ class Funcionario(Base):
     nome = Column(String, nullable=False)
     cargo = Column(String, nullable=False)
     ativo = Column(Boolean, default=True)
+    tipo_entrega = Column(String, default="Não se aplica")
 
 
 class LancamentoSemanal(Base):

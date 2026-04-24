@@ -1,18 +1,17 @@
-def cargo_recebe_entrega(cargo: str) -> bool:
-    cargo_normalizado = cargo.strip().lower()
+def recebe_bonus_entrega(tipo_entrega: str) -> bool:
+    tipo = (tipo_entrega or "").strip().lower()
 
-    cargos_validos = {
+    tipos_validos = {
         "motorista",
         "ajudante",
         "ajudante de motorista",
-        "ajudante motorista",
     }
 
-    return cargo_normalizado in cargos_validos
+    return tipo in tipos_validos
 
 
 def calcular_bonus(
-    cargo: str,
+    tipo_entrega: str,
     pedidos_separados: int,
     pedidos_carregados: int,
     toneladas: float,
@@ -21,7 +20,11 @@ def calcular_bonus(
     nota: int,
     penalidade: bool
 ) -> float:
-    valor_entregas = entregas * 0.30 if cargo_recebe_entrega(cargo) else 0.0
+    valor_entregas = 0.0
+    perda_retornos = 0.0
+
+    if recebe_bonus_entrega(tipo_entrega):
+        valor_entregas = entregas * 0.30
 
     ganho = (
         pedidos_separados * 0.10 +
@@ -33,7 +36,7 @@ def calcular_bonus(
     if penalidade:
         ganho *= 0.5
 
-    perda = retornos * 0.60
+    perda = retornos * 0.60 if recebe_bonus_entrega(tipo_entrega) else 0.0
     base = max(0, ganho - perda)
 
     fatores = {
@@ -53,5 +56,5 @@ def calcular_bonus_mensal(lancamentos, ausencias: int) -> float:
         return 0.0
 
     total = sum(l.bonus_calculado for l in lancamentos)
-    total += 150.0  # saldo fixo de assiduidade
+    total += 150.0
     return round(total, 2)

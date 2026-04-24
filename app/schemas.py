@@ -5,17 +5,17 @@ class FuncionarioCreate(BaseModel):
     nome: str
     cargo: str
     ativo: bool = True
-
+    tipo_entrega: str
 
 class FuncionarioResponse(BaseModel):
     id: int
     nome: str
     cargo: str
     ativo: bool
+    tipo_entrega: str
 
     class Config:
         from_attributes = True
-
 
 class LancamentoSemanalCreate(BaseModel):
     funcionario_id: int
@@ -47,6 +47,16 @@ class LancamentoSemanalResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class LancamentoSemanalUpdate(BaseModel):
+    semana: str
+    pedidos_separados: int = 0
+    pedidos_carregados: int = 0
+    toneladas: float = 0
+    entregas: int = 0
+    retornos: int = 0
+    nota: int
+    penalidade: bool = False
+    motivo_penalidade: str | None = None
 
 class FrequenciaMensalCreate(BaseModel):
     funcionario_id: int
