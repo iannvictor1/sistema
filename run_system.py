@@ -67,7 +67,7 @@ def rodar_backend() -> None:
 
     uvicorn.run(
         "app.main:app",
-        host="127.0.0.1",
+        host="0.0.0.0",
         port=8000,
         reload=False,
     )
@@ -90,7 +90,7 @@ def rodar_frontend() -> None:
         "run",
         frontend_path,
         "--server.port=8501",
-        "--server.address=127.0.0.1",
+        "--server.address=0.0.0.0",
         "--server.headless=true",
         "--browser.gatherUsageStats=false",
         "--global.developmentMode=false",

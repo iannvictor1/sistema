@@ -1,6 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Date
 from .database import Base
-
 
 class Funcionario(Base):
     __tablename__ = "funcionarios"
@@ -17,7 +16,12 @@ class LancamentoSemanal(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     funcionario_id = Column(Integer, ForeignKey("funcionarios.id"), nullable=False)
+    
     semana = Column(String, nullable=False)
+    tipo_lancamento = Column(String, default="semanal")
+    data_lancamento = Column(Date, nullable=True)
+    usuario_lancamento = Column(String, nullable=True)
+    
     pedidos_separados = Column(Integer, default=0)
     pedidos_carregados = Column(Integer, default=0)
     toneladas = Column(Float, default=0)

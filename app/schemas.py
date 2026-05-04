@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from datetime import date
+from typing import Optional
 
 
 class FuncionarioCreate(BaseModel):
@@ -20,6 +22,9 @@ class FuncionarioResponse(BaseModel):
 class LancamentoSemanalCreate(BaseModel):
     funcionario_id: int
     semana: str
+    tipo_lancamento: str = "semanal"
+    data_lancamento: Optional[date] = None
+    usuario_lancamento: Optional[str] = None
     pedidos_separados: int = 0
     pedidos_carregados: int = 0
     toneladas: float = 0

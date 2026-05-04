@@ -10,9 +10,6 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     ws = wb.active
     wb.remove(ws)
 
-    # =========================
-    # Estilos
-    # =========================
     cor_titulo = "1F1F1F"
     cor_header = "1F4E78"
     cor_header_clara = "D9EAF7"
@@ -168,12 +165,16 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
 
     ws_resumo.freeze_panes = "A5"
     ws_resumo.auto_filter.ref = f"A4:I{max(linha_atual - 1, 4)}"
+    
+    funcionarios_dict = {f.id: f.nome for f in funcionarios}
+
+    funcionarios_dict = {f.id: f.nome for f in funcionarios}
 
     # =========================
     # Aba 2 - Lançamentos Semanais
     # =========================
     ws_lanc = wb.create_sheet("Lançamentos Semanais")
-    ws_lanc.merge_cells("A1:L1")
+    ws_lanc.merge_cells("A1:P1")
     ws_lanc["A1"] = "Detalhamento dos Lançamentos Semanais"
     ws_lanc["A1"].font = fonte_titulo
     ws_lanc["A1"].fill = fill_titulo
@@ -182,7 +183,11 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     headers_lanc = [
         "ID",
         "Funcionário ID",
+        "Funcionário",
         "Semana",
+        "Tipo",
+        "Data",
+        "Usuário",
         "Pedidos Separados",
         "Pedidos Carregados",
         "Toneladas",
@@ -201,39 +206,96 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
 
     linha = 4
     for l in lancamentos:
+        tipo = getattr(l, "tipo_lancamento", "semanal") or "semanal"
+
+        if tipo == "diario":
+            continue
+
         ws_lanc.cell(linha, 1, l.id)
         ws_lanc.cell(linha, 2, l.funcionario_id)
-        ws_lanc.cell(linha, 3, l.semana)
-        ws_lanc.cell(linha, 4, l.pedidos_separados)
-        ws_lanc.cell(linha, 5, l.pedidos_carregados)
-        ws_lanc.cell(linha, 6, l.toneladas)
-        ws_lanc.cell(linha, 7, l.entregas)
-        ws_lanc.cell(linha, 8, l.retornos)
-        ws_lanc.cell(linha, 9, l.nota)
-        ws_lanc.cell(linha, 10, "Sim" if l.penalidade else "Não")
-        ws_lanc.cell(linha, 11, l.motivo_penalidade if l.motivo_penalidade else "-")
-        ws_lanc.cell(linha, 12, l.bonus_calculado)
+        ws_lanc.cell(linha, 3, funcionarios_dict.get(l.funcionario_id, "-"))
+        ws_lanc.cell(linha, 4, l.semana)
+        ws_lanc.cell(linha, 5, tipo)
+        ws_lanc.cell(linha, 6, getattr(l, "data_lancamento", None))
+        ws_lanc.cell(linha, 7, getattr(l, "usuario_lancamento", "-"))
+        ws_lanc.cell(linha, 8, l.pedidos_separados)
+        ws_lanc.cell(linha, 9, l.pedidos_carregados)
+        ws_lanc.cell(linha, 10, l.toneladas)
+        ws_lanc.cell(linha, 11, l.entregas)
+        ws_lanc.cell(linha, 12, l.retornos)
+        ws_lanc.cell(linha, 13, l.nota)
+        ws_lanc.cell(linha, 14, "Sim" if l.penalidade else "Não")
+        ws_lanc.cell(linha, 15, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_lanc.cell(linha, 16, l.bonus_calculado)
 
-        for col in range(1, 13):
+        for col in range(1, 17):
             ws_lanc.cell(linha, col).border = borda_fina
 
-        formatar_moeda(ws_lanc.cell(linha, 12))
+        formatar_moeda(ws_lanc.cell(linha, 16))
         linha += 1
 
     ws_lanc.freeze_panes = "A4"
-    ws_lanc.auto_filter.ref = f"A3:L{max(linha - 1, 3)}"
+    ws_lanc.auto_filter.ref = f"A3:P{max(linha - 1, 3)}"
 
     # =========================
-    # Aba 3 - Frequência Mensal
+    # Aba 3 - Lançamentos Diários
+    # =========================
+    ws_diario = wb.create_sheet("Lançamentos Diários")
+    ws_diario.merge_cells("A1:P1")
+    ws_diario["A1"] = "Detalhamento dos Lançamentos Diários"
+    ws_diario["A1"].font = fonte_titulo
+    ws_diario["A1"].fill = fill_titulo
+    ws_diario["A1"].alignment = alinhamento_centro
+
+    for i, valor in enumerate(headers_lanc, start=1):
+        ws_diario.cell(row=3, column=i, value=valor)
+
+    estilizar_header(ws_diario, 3)
+
+    linha = 4
+    for l in lancamentos:
+        tipo = getattr(l, "tipo_lancamento", "semanal") or "semanal"
+
+        if tipo != "diario":
+            continue
+
+        ws_diario.cell(linha, 1, l.id)
+        ws_diario.cell(linha, 2, l.funcionario_id)
+        ws_diario.cell(linha, 3, funcionarios_dict.get(l.funcionario_id, "-"))
+        ws_diario.cell(linha, 4, l.semana)
+        ws_diario.cell(linha, 5, tipo)
+        ws_diario.cell(linha, 6, getattr(l, "data_lancamento", None))
+        ws_diario.cell(linha, 7, getattr(l, "usuario_lancamento", "-"))
+        ws_diario.cell(linha, 8, l.pedidos_separados)
+        ws_diario.cell(linha, 9, l.pedidos_carregados)
+        ws_diario.cell(linha, 10, l.toneladas)
+        ws_diario.cell(linha, 11, l.entregas)
+        ws_diario.cell(linha, 12, l.retornos)
+        ws_diario.cell(linha, 13, l.nota)
+        ws_diario.cell(linha, 14, "Sim" if l.penalidade else "Não")
+        ws_diario.cell(linha, 15, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_diario.cell(linha, 16, l.bonus_calculado)
+
+        for col in range(1, 17):
+            ws_diario.cell(linha, col).border = borda_fina
+
+        formatar_moeda(ws_diario.cell(linha, 16))
+        linha += 1
+
+    ws_diario.freeze_panes = "A4"
+    ws_diario.auto_filter.ref = f"A3:P{max(linha - 1, 3)}"
+
+    # =========================
+    # Aba 4 - Frequência Mensal (RESTAURADA)
     # =========================
     ws_freq = wb.create_sheet("Frequência Mensal")
-    ws_freq.merge_cells("A1:D1")
+    ws_freq.merge_cells("A1:E1")
     ws_freq["A1"] = "Controle de Frequência Mensal"
     ws_freq["A1"].font = fonte_titulo
     ws_freq["A1"].fill = fill_titulo
     ws_freq["A1"].alignment = alinhamento_centro
 
-    headers_freq = ["ID", "Funcionário ID", "Mês", "Ausências"]
+    headers_freq = ["ID", "Funcionário ID", "Funcionário", "Mês", "Ausências"]
 
     for i, valor in enumerate(headers_freq, start=1):
         ws_freq.cell(row=3, column=i, value=valor)
@@ -244,24 +306,18 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     for f in frequencias:
         ws_freq.cell(linha, 1, f.id)
         ws_freq.cell(linha, 2, f.funcionario_id)
-        ws_freq.cell(linha, 3, f.mes)
-        ws_freq.cell(linha, 4, f.ausencias)
+        ws_freq.cell(linha, 3, funcionarios_dict.get(f.funcionario_id, "-"))
+        ws_freq.cell(linha, 4, f.mes)
+        ws_freq.cell(linha, 5, f.ausencias)
 
-        for col in range(1, 5):
+        for col in range(1, 6):
             ws_freq.cell(linha, col).border = borda_fina
-
-        if f.ausencias > 0:
-            for col in range(1, 5):
-                ws_freq.cell(linha, col).fill = fill_bloqueado
 
         linha += 1
 
     ws_freq.freeze_panes = "A4"
     ws_freq.auto_filter.ref = f"A3:D{max(linha - 1, 3)}"
 
-    # =========================
-    # Aba 4 - Funcionários
-    # =========================
     ws_func = wb.create_sheet("Funcionários")
     ws_func.merge_cells("A1:D1")
     ws_func["A1"] = "Base de Funcionários"
@@ -291,9 +347,6 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     ws_func.freeze_panes = "A4"
     ws_func.auto_filter.ref = f"A3:D{max(linha - 1, 3)}"
 
-    # =========================
-    # Ajustes finais
-    # =========================
     for worksheet in wb.worksheets:
         auto_ajustar_colunas(worksheet)
 

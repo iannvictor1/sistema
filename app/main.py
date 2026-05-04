@@ -103,6 +103,9 @@ def criar_lancamento_semanal(
     novo = LancamentoSemanal(
         funcionario_id=lancamento.funcionario_id,
         semana=lancamento.semana,
+        tipo_lancamento=lancamento.tipo_lancamento,
+        data_lancamento=lancamento.data_lancamento,
+        usuario_lancamento=lancamento.usuario_lancamento,
         pedidos_separados=lancamento.pedidos_separados,
         pedidos_carregados=lancamento.pedidos_carregados,
         toneladas=lancamento.toneladas,

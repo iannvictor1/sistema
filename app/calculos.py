@@ -25,6 +25,7 @@ def calcular_bonus(
 
     if recebe_bonus_entrega(tipo_entrega):
         valor_entregas = entregas * 0.30
+        perda_retornos = retornos * 0.60
 
     ganho = (
         pedidos_separados * 0.10 +
@@ -37,7 +38,7 @@ def calcular_bonus(
         ganho *= 0.5
 
     perda = retornos * 0.60 if recebe_bonus_entrega(tipo_entrega) else 0.0
-    base = max(0, ganho - perda)
+    base = max(0, ganho - perda_retornos)
 
     fatores = {
         5: 1.0,
