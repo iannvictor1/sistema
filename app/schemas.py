@@ -39,6 +39,12 @@ class LancamentoSemanalResponse(BaseModel):
     id: int
     funcionario_id: int
     semana: str
+
+    tipo_lancamento: str = "semanal"
+    data_lancamento: Optional[date] = None
+    data_registro: Optional[date] = None
+    usuario_lancamento: Optional[str] = None
+
     pedidos_separados: int
     pedidos_carregados: int
     toneladas: float

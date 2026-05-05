@@ -186,7 +186,8 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         "Funcionário",
         "Semana",
         "Tipo",
-        "Data",
+        "Data do Lançamento",
+        "Data Escolhida",
         "Usuário",
         "Pedidos Separados",
         "Pedidos Carregados",
@@ -216,8 +217,9 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_lanc.cell(linha, 3, funcionarios_dict.get(l.funcionario_id, "-"))
         ws_lanc.cell(linha, 4, l.semana)
         ws_lanc.cell(linha, 5, tipo)
-        ws_lanc.cell(linha, 6, getattr(l, "data_lancamento", None))
-        ws_lanc.cell(linha, 7, getattr(l, "usuario_lancamento", "-"))
+        ws_lanc.cell(linha, 6, getattr(l, "data_registro", None))
+        ws_lanc.cell(linha, 7, getattr(l, "data_lancamento", None))
+        ws_lanc.cell(linha, 8, getattr(l, "usuario_lancamento", "-"))
         ws_lanc.cell(linha, 8, l.pedidos_separados)
         ws_lanc.cell(linha, 9, l.pedidos_carregados)
         ws_lanc.cell(linha, 10, l.toneladas)
@@ -264,19 +266,20 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_diario.cell(linha, 3, funcionarios_dict.get(l.funcionario_id, "-"))
         ws_diario.cell(linha, 4, l.semana)
         ws_diario.cell(linha, 5, tipo)
-        ws_diario.cell(linha, 6, getattr(l, "data_lancamento", None))
-        ws_diario.cell(linha, 7, getattr(l, "usuario_lancamento", "-"))
-        ws_diario.cell(linha, 8, l.pedidos_separados)
-        ws_diario.cell(linha, 9, l.pedidos_carregados)
-        ws_diario.cell(linha, 10, l.toneladas)
-        ws_diario.cell(linha, 11, l.entregas)
-        ws_diario.cell(linha, 12, l.retornos)
-        ws_diario.cell(linha, 13, l.nota)
-        ws_diario.cell(linha, 14, "Sim" if l.penalidade else "Não")
-        ws_diario.cell(linha, 15, l.motivo_penalidade if l.motivo_penalidade else "-")
-        ws_diario.cell(linha, 16, l.bonus_calculado)
+        ws_diario.cell(linha, 6, getattr(l, "data_registro", None))
+        ws_diario.cell(linha, 7, getattr(l, "data_lancamento", None))
+        ws_diario.cell(linha, 8, getattr(l, "usuario_lancamento", "-"))
+        ws_diario.cell(linha, 9, l.pedidos_separados)
+        ws_diario.cell(linha, 10, l.pedidos_carregados)
+        ws_diario.cell(linha, 11, l.toneladas)
+        ws_diario.cell(linha, 12, l.entregas)
+        ws_diario.cell(linha, 13, l.retornos)
+        ws_diario.cell(linha, 14, l.nota)
+        ws_diario.cell(linha, 15, "Sim" if l.penalidade else "Não")
+        ws_diario.cell(linha, 16, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_diario.cell(linha, 17, l.bonus_calculado)
 
-        for col in range(1, 17):
+        for col in range(1, 18):
             ws_diario.cell(linha, col).border = borda_fina
 
         formatar_moeda(ws_diario.cell(linha, 16))

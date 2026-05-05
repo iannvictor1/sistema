@@ -15,6 +15,7 @@ from .schemas import (
 )
 from .calculos import calcular_bonus, calcular_bonus_mensal
 from .export_excel import exportar_fechamento_excel
+from datetime import date
 
 app = FastAPI(title="Sistema de Bonificação")
 
@@ -105,6 +106,7 @@ def criar_lancamento_semanal(
         semana=lancamento.semana,
         tipo_lancamento=lancamento.tipo_lancamento,
         data_lancamento=lancamento.data_lancamento,
+        data_registro=date.today(),
         usuario_lancamento=lancamento.usuario_lancamento,
         pedidos_separados=lancamento.pedidos_separados,
         pedidos_carregados=lancamento.pedidos_carregados,

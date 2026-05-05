@@ -4,37 +4,47 @@ import streamlit as st
 def aplicar_estilos():
     st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
+/* ===== OCULTAR ELEMENTOS NATIVOS DO STREAMLIT ===== */
 header[data-testid="stHeader"],
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
 #MainMenu { display: none !important; visibility: hidden !important; }
 footer { visibility: hidden !important; }
 
+/* ===== VARIÁVEIS ===== */
 :root {
-    --crimson-900: #1E0202;
-    --crimson-800: #3B0505;
-    --crimson-700: #5E0808;
-    --crimson-600: #7A0C0C;
-    --crimson-500: #9B1111;
-    --gold-400:    #E8A800;
-    --gold-300:    #F2B800;
-    --gold-200:    #FFD15C;
+    --ink-950: #060B14;
+    --ink-900: #0C1526;
+    --ink-800: #111E36;
+    --ink-700: #172744;
+    --ink-600: #1E3357;
+    --ink-500: #26406C;
+    --mint-400: #2FFFA0;
+    --mint-300: #5CFFB5;
+    --mint-200: #A8FFDA;
+    --mint-100: #D4FFF0;
+    --slate-500: rgba(255,255,255,0.55);
+    --slate-400: rgba(255,255,255,0.38);
+    --slate-300: rgba(255,255,255,0.18);
+    --slate-200: rgba(255,255,255,0.09);
+    --slate-100: rgba(255,255,255,0.05);
     --text-primary: #FFFFFF;
     --text-soft:    rgba(255,255,255,0.75);
     --text-muted:   rgba(255,255,255,0.45);
-    --surface-1:    rgba(255,255,255,0.06);
-    --surface-2:    rgba(255,255,255,0.10);
-    --border:       rgba(255,255,255,0.10);
-    --success:  #22C55E;
-    --danger:   #EF4444;
-    --neutral:  rgba(255,255,255,0.40);
+    --border:       rgba(255,255,255,0.18);
+    --success:  #2FFFA0;
+    --danger:   #FF6B6B;
+    --warn:     #FFD166;
+    --neutral:  rgba(255,255,255,0.38);
 }
 
+/* ===== RESET E TIPOGRAFIA ===== */
+*, *::before, *::after { box-sizing: border-box; }
+
 *, html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-    box-sizing: border-box;
+    font-family: 'Space Grotesk', sans-serif !important;
 }
 
 html, body, .stApp {
@@ -43,16 +53,23 @@ html, body, .stApp {
     color: var(--text-primary) !important;
 }
 
+/* ===== BACKGROUND ===== */
 .stApp {
-    background: linear-gradient(160deg,
-        var(--crimson-500) 0%,
-        var(--crimson-600) 30%,
-        var(--crimson-700) 65%,
-        var(--crimson-900) 100%
-    ) !important;
-    background-attachment: fixed;
+    background: var(--ink-950) !important;
 }
 
+/* ===== FAIXA LATERAL (decorativa) ===== */
+.stApp::before {
+    content: '';
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--mint-400) 0%, #5B8BFF 60%, transparent 100%);
+    border-radius: 0 2px 2px 0;
+    z-index: 999;
+}
+
+/* ===== CONTAINERS ===== */
 .block-container,
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
@@ -63,86 +80,130 @@ html, body, .stApp {
 }
 
 .block-container {
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-    padding-bottom: 3rem !important;
+    padding-left: 2.5rem !important;
+    padding-right: 2.5rem !important;
+    padding-bottom: 4rem !important;
+    padding-top: 2rem !important;
 }
 
 /* ===== HEADER ===== */
 .header-wrap {
-    text-align: center;
-    padding: 3.5rem 0 2.5rem;
+    position: relative;
+    text-align: left;
+    width: 100%;
+    padding: 3rem 0 2.5rem !important;
+    margin: 0 0 0.5rem !important;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
 }
 
+/* Grid de fundo no header */
+.header-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+        linear-gradient(var(--slate-100) 1px, transparent 1px),
+        linear-gradient(90deg, var(--slate-100) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(ellipse 80% 100% at 50% 0%, black 30%, transparent 100%);
+    pointer-events: none;
+}
+
+/* Tag acima do título (eyebrow) */
 .header-eyebrow {
-    display: inline-block;
-    background: var(--gold-400);
-    color: var(--crimson-700);
-    padding: 6px 16px;
-    border-radius: 8px;
-    font-weight: 700;
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.65rem;
+    color: var(--mint-400);
+    letter-spacing: 0.18em;
     text-transform: uppercase;
     margin-bottom: 1.25rem;
+    position: relative;
+    z-index: 1;
+}
+
+.header-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--mint-400);
+    flex-shrink: 0;
 }
 
 .header-title {
-    font-family: 'Anton', sans-serif !important;
-    font-size: clamp(2.4rem, 5.8vw, 4.8rem);
-    line-height: 0.95;
-    letter-spacing: 0.02em;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: clamp(2.2rem, 5.5vw, 4.2rem);
+    font-weight: 700 !important;
+    line-height: 1;
+    letter-spacing: -0.03em !important;
     color: #FFFFFF;
-    text-transform: uppercase;
+    text-transform: none;
     margin: 0;
-    text-shadow: 0 2px 0 rgba(0,0,0,0.18);
+    text-shadow: none;
+    position: relative;
+    z-index: 1;
 }
 
 .header-title span {
-    font-family: 'Anton', sans-serif !important;
-    color: var(--gold-300);
+    font-family: 'Space Grotesk', sans-serif !important;
+    color: var(--mint-400);
+    font-style: normal;
 }
 
-.header-line {
-    width: min(600px, 80%);
-    height: 1px;
-    margin: 1.75rem auto 0;
-    background: linear-gradient(
-        90deg,
-        transparent,
-        var(--gold-400),
-        transparent
-    );
-    opacity: 0.5;
+.header-desc {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: var(--slate-500);
+    max-width: 480px;
+    line-height: 1.6;
+    position: relative;
+    z-index: 1;
 }
+
+/* Remover header-line (não existe no novo design) */
+.header-line { display: none !important; }
 
 /* ===== TABS ===== */
 .stTabs [data-baseweb="tab-list"] {
-    background: rgba(0,0,0,0.20);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 6px;
-    gap: 4px;
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
     margin-bottom: 2rem;
     overflow-x: auto;
-    backdrop-filter: blur(8px);
+    backdrop-filter: none !important;
 }
 
 .stTabs [data-baseweb="tab"] {
-    color: var(--text-soft) !important;
-    font-weight: 600 !important;
-    font-size: 0.85rem !important;
-    border-radius: 10px !important;
-    padding: 10px 18px !important;
-    transition: all 0.2s ease;
+    color: var(--slate-500) !important;
+    font-weight: 500 !important;
+    font-size: 0.81rem !important;
+    border-radius: 0 !important;
+    padding: 1rem 1.125rem !important;
+    transition: all 0.15s ease;
     white-space: nowrap !important;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.01em !important;
+    border-bottom: 2px solid transparent !important;
+    margin-bottom: -1px !important;
+    background: transparent !important;
 }
 
 .stTabs [aria-selected="true"] {
-    background: var(--gold-400) !important;
-    color: var(--crimson-700) !important;
-    font-weight: 700 !important;
+    background: transparent !important;
+    color: var(--mint-400) !important;
+    font-weight: 600 !important;
+    border-bottom-color: var(--mint-400) !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover:not([aria-selected="true"]) {
+    color: rgba(255,255,255,0.75) !important;
 }
 
 /* ===== HEADINGS ===== */
@@ -151,21 +212,29 @@ h1, h2, h3,
 [data-testid="stSubheader"] {
     color: white !important;
     font-weight: 700 !important;
-    letter-spacing: -0.01em !important;
+    letter-spacing: -0.02em !important;
+    font-family: 'Space Grotesk', sans-serif !important;
 }
 
 h2, h3 {
-    border-bottom: 1px solid rgba(232,168,0,0.20);
-    padding-bottom: 0.6rem;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.69rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: var(--slate-400) !important;
+    border-bottom: 1px solid var(--slate-200) !important;
+    padding-bottom: 0.625rem !important;
+    margin-bottom: 1rem !important;
 }
 
 /* ===== FORMS ===== */
 [data-testid="stForm"] {
-    background: rgba(0,0,0,0.22);
-    backdrop-filter: blur(12px);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 2rem !important;
+    background: var(--ink-800) !important;
+    backdrop-filter: none !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 16px !important;
+    padding: 1.75rem !important;
 }
 
 /* ===== LABELS ===== */
@@ -175,11 +244,12 @@ label,
 .stSelectbox label,
 .stDateInput label,
 .stCheckbox label {
-    color: var(--gold-200) !important;
-    font-size: 0.78rem !important;
-    font-weight: 600 !important;
+    color: var(--slate-500) !important;
+    font-size: 0.625rem !important;
+    font-weight: 700 !important;
+    font-family: 'Space Mono', monospace !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.08em !important;
+    letter-spacing: 0.13em !important;
 }
 
 /* ===== INPUTS ===== */
@@ -189,137 +259,240 @@ label,
 .stTextArea textarea,
 .stSelectbox [data-baseweb="select"],
 .stSelectbox [data-baseweb="select"] > div {
-    background: rgba(255,255,255,0.10) !important;
+    background: var(--ink-950) !important;
     color: #FFFFFF !important;
-    border: 1px solid rgba(255,255,255,0.16) !important;
-    border-radius: 10px !important;
-    font-size: 0.9rem !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    font-size: 0.875rem !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+}
+
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder {
+    color: var(--slate-400) !important;
 }
 
 .stTextInput input:focus,
 .stNumberInput input:focus,
 .stDateInput input:focus,
 .stTextArea textarea:focus {
-    border-color: var(--gold-400) !important;
-    box-shadow: 0 0 0 2px rgba(232,168,0,0.15) !important;
-    outline: none;
+    border-color: var(--mint-400) !important;
+    box-shadow: 0 0 0 3px rgba(47,255,160,0.10) !important;
+    outline: none !important;
 }
 
-/* ===== BUTTONS ===== */
+/* ===== BOTÕES ===== */
 .stButton > button,
 .stDownloadButton > button {
-    background: var(--gold-400) !important;
-    color: var(--crimson-700) !important;
+    background: var(--mint-400) !important;
+    color: var(--ink-950) !important;
     font-weight: 700 !important;
-    font-size: 0.88rem !important;
-    letter-spacing: 0.02em;
+    font-size: 0.81rem !important;
+    letter-spacing: 0.01em !important;
+    font-family: 'Space Grotesk', sans-serif !important;
     border: none !important;
-    border-radius: 10px !important;
-    padding: 0.75rem 1.5rem !important;
-    transition: all 0.18s ease;
+    border-radius: 8px !important;
+    padding: 0.69rem 1.375rem !important;
+    transition: all 0.15s ease !important;
 }
 
 .stButton > button:hover,
 .stDownloadButton > button:hover {
-    background: var(--gold-300) !important;
-    transform: translateY(-1px);
+    background: var(--mint-300) !important;
+    transform: translateY(-1px) !important;
 }
 
 .stButton > button:active,
 .stDownloadButton > button:active {
-    transform: translateY(0);
+    transform: translateY(0) !important;
 }
 
-/* ===== CARDS ===== */
+/* Botão secundário (outline) — use st.button com key "outline" ou classe customizada via markdown */
+.btn-outline-st > button {
+    background: transparent !important;
+    color: var(--slate-500) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.81rem !important;
+    padding: 0.69rem 1.375rem !important;
+    transition: all 0.15s !important;
+}
+
+.btn-outline-st > button:hover {
+    color: #fff !important;
+    border-color: rgba(255,255,255,0.35) !important;
+    background: transparent !important;
+    transform: none !important;
+}
+
+/* ===== CARDS / EXPANDERS ===== */
 [data-testid="stForm"],
 .card-item,
 [data-testid="stExpander"] {
-    background: rgba(94, 8, 8, 0.70) !important;
+    background: var(--ink-800) !important;
     border: 1px solid var(--border) !important;
-    border-radius: 16px !important;
-    padding: 16px 20px;
-    backdrop-filter: blur(8px);
+    border-radius: 12px !important;
+    padding: 1.375rem 1.25rem !important;
+    backdrop-filter: none !important;
 }
 
-.card-item strong {
-    color: white;
-}
+.card-item strong { color: white; }
 
 /* ===== BADGES ===== */
 .badge-sim,
 .badge-elegivel {
-    background: rgba(34,197,94,0.12);
-    color: #86EFAC;
-    border: 1px solid rgba(34,197,94,0.25);
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 0.8rem;
+    background: rgba(47,255,160,0.12);
+    color: var(--mint-300);
+    border: 1px solid rgba(47,255,160,0.25);
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.625rem;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 .badge-nao {
-    background: rgba(255,255,255,0.07);
-    color: var(--neutral);
-    border: 1px solid rgba(255,255,255,0.10);
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 0.8rem;
+    background: var(--slate-200);
+    color: var(--slate-400);
+    border: 1px solid var(--slate-300);
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.625rem;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 .badge-eliminado {
-    background: rgba(239,68,68,0.12);
-    color: #FCA5A5;
-    border: 1px solid rgba(239,68,68,0.25);
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 0.8rem;
-}
-
-/* ===== BONUS ===== */
-.valor-bonus {
-    color: var(--gold-200);
+    background: rgba(255,107,107,0.12);
+    color: #FF9E9E;
+    border: 1px solid rgba(255,107,107,0.25);
+    padding: 3px 9px;
+    border-radius: 4px;
     font-weight: 700;
+    font-size: 0.625rem;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
-/* ===== ALERTS ===== */
+.badge-pendente {
+    background: rgba(255,209,102,0.12);
+    color: #FFDD77;
+    border: 1px solid rgba(255,209,102,0.25);
+    padding: 3px 9px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.625rem;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* ===== VALOR BÔNUS ===== */
+.valor-bonus {
+    color: var(--mint-400);
+    font-weight: 700;
+    font-family: 'Space Mono', monospace;
+}
+
+/* ===== ALERTS / NOTICES ===== */
 [data-testid="stAlert"] {
-    background: rgba(255,255,255,0.08) !important;
-    color: #FFFFFF !important;
-    border-radius: 12px !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
+    background: rgba(47,255,160,0.06) !important;
+    color: var(--slate-500) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(47,255,160,0.18) !important;
 }
 
 [data-testid="stAlert"] p {
-    color: #FFFFFF !important;
+    color: var(--slate-500) !important;
+}
+
+/* Alert de erro */
+[data-testid="stAlert"][data-type="error"] {
+    background: rgba(255,107,107,0.07) !important;
+    border-color: rgba(255,107,107,0.20) !important;
+    color: #FF9E9E !important;
+}
+
+[data-testid="stAlert"][data-type="error"] p {
+    color: #FF9E9E !important;
 }
 
 /* ===== DIVIDERS ===== */
 hr {
-    border-color: rgba(255,255,255,0.07) !important;
+    border-color: var(--slate-200) !important;
 }
 
-/* ===== SCROLL ===== */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* ===== MÉTRICAS NATIVAS DO STREAMLIT ===== */
+[data-testid="stMetric"] {
+    background: var(--ink-800);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+[data-testid="stMetricLabel"] {
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.625rem !important;
+    color: var(--slate-400) !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+}
+
+[data-testid="stMetricValue"] {
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+    color: #fff !important;
+    letter-spacing: -0.03em !important;
+    line-height: 1 !important;
+}
+
+[data-testid="stMetricDelta"] {
+    font-size: 0.69rem !important;
+    font-weight: 500 !important;
+    color: var(--mint-400) !important;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-    background: rgba(232,168,0,0.40);
-    border-radius: 999px;
+    background: var(--slate-300);
+    border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(232,168,0,0.65);
+    background: var(--slate-400);
+}
+
+/* ===== LOGO FIXA ===== */
+.logo-fixa {
+    position: absolute;
+    top: 28px;
+    left: 40px;
+    z-index: 999;
+}
+
+.logo-fixa img {
+    width: 110px;
+    height: auto;
 }
 
 /* ===== MOBILE ===== */
 @media (max-width: 768px) {
     .block-container {
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
     }
-    .header-wrap { padding: 2rem 0 1.5rem; }
+    .header-wrap {
+        padding: 2.5rem 0 2rem !important;
+    }
     .header-title {
-        font-size: clamp(2.2rem, 11vw, 3.6rem) !important;
+        font-size: clamp(2rem, 10vw, 3.2rem) !important;
     }
     .stTabs [data-baseweb="tab-list"] {
         flex-wrap: nowrap !important;
@@ -327,9 +500,22 @@ hr {
     }
     .stTabs [data-baseweb="tab"] {
         min-width: max-content !important;
-        font-size: 0.78rem !important;
+        font-size: 0.72rem !important;
     }
-    [data-testid="stForm"] { padding: 1.25rem !important; }
+    [data-testid="stForm"] {
+        padding: 1.25rem !important;
+    }
+    .logo-fixa {
+        top: 15px;
+        left: 15px;
+    }
+    .logo-fixa img {
+        width: 80px;
+    }
+    .header-wrap {
+        text-align: left;
+        width: 100%;
+    }
 }
 </style>
 """, unsafe_allow_html=True)

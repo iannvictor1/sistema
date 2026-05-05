@@ -20,6 +20,7 @@ class LancamentoSemanal(Base):
     semana = Column(String, nullable=False)
     tipo_lancamento = Column(String, default="semanal")
     data_lancamento = Column(Date, nullable=True)
+    data_registro = Column(Date, nullable=True)
     usuario_lancamento = Column(String, nullable=True)
     
     pedidos_separados = Column(Integer, default=0)

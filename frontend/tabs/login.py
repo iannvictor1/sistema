@@ -28,84 +28,208 @@ def tela_login():
         return
 
     st.markdown("""
-    <style>
-        [data-testid="stSidebar"] {
-            display: none;
-        }
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
-        .block-container {
-            padding-top: 7rem;
-            max-width: 620px;
-        }
+*, html, body, [class*="css"] {
+    font-family: 'Space Grotesk', sans-serif !important;
+    box-sizing: border-box;
+}
 
-        .login-logo {
-            width: 82px;
-            height: 82px;
-            margin: 0 auto 18px auto;
-            border-radius: 24px;
-            background: linear-gradient(135deg, #990000, #f2a900);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 38px;
-            box-shadow: 0 16px 45px rgba(0,0,0,0.45);
-        }
+:root {
+    --ink-950: #060B14;
+    --ink-900: #0C1526;
+    --ink-800: #111E36;
+    --mint-400: #2FFFA0;
+    --mint-300: #5CFFB5;
+    --slate-500: rgba(255,255,255,0.55);
+    --slate-400: rgba(255,255,255,0.38);
+    --slate-300: rgba(255,255,255,0.18);
+    --slate-200: rgba(255,255,255,0.09);
+    --slate-100: rgba(255,255,255,0.05);
+}
 
-        .login-title {
-            text-align: center;
-            font-size: 34px;
-            font-weight: 900;
-            color: #ffffff;
-            margin-bottom: 6px;
-        }
+html, body, .stApp {
+    background: var(--ink-950) !important;
+    color: #fff !important;
+}
 
-        .login-subtitle {
-            text-align: center;
-            color: #f2a900;
-            font-weight: 700;
-            margin-bottom: 32px;
-        }
+/* Faixa lateral decorativa */
+.stApp::before {
+    content: '';
+    position: fixed;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--mint-400) 0%, #5B8BFF 60%, transparent 100%);
+    border-radius: 0 2px 2px 0;
+    z-index: 999;
+}
 
-        div[data-testid="stForm"] {
-            background: rgba(120, 0, 0, 0.72);
-            border: 1px solid rgba(242,169,0,0.22);
-            padding: 32px 34px 28px 34px;
-            border-radius: 22px;
-            box-shadow: 0 18px 55px rgba(0,0,0,0.38);
-        }
+header[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+#MainMenu { display: none !important; visibility: hidden !important; }
+footer { visibility: hidden !important; }
 
-        .stTextInput label {
-            color: #f2a900 !important;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
+[data-testid="stSidebar"] { display: none !important; }
 
-        .stTextInput input {
-            background-color: #2f333d !important;
-            color: #ffffff !important;
-            border-radius: 12px !important;
-            border: 1px solid rgba(255,255,255,0.18) !important;
-            height: 44px;
-        }
+.block-container {
+    padding-top: 6rem !important;
+    max-width: 480px !important;
+    margin: 0 auto !important;
+}
 
-        .stButton button,
-        div[data-testid="stFormSubmitButton"] button {
-            width: 100%;
-            height: 48px;
-            border-radius: 14px;
-            background: #f2a900 !important;
-            color: #1a1a1a !important;
-            font-weight: 900;
-            border: none;
-            margin-top: 12px;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+/* ── Ícone ── */
+.login-logo {
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px auto;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--ink-800) 0%, var(--ink-600, #1E3357) 100%);
+    border: 1px solid var(--slate-300);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+
+/* ── Tag acima do título ── */
+.login-tag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.6rem;
+    color: var(--mint-400);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+}
+
+.login-tag::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--mint-400);
+}
+
+/* ── Título e subtítulo ── */
+.login-title {
+    text-align: center;
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: #ffffff;
+    margin-bottom: 6px;
+    line-height: 1.05;
+}
+
+.login-title em {
+    font-style: normal;
+    color: var(--mint-400);
+}
+
+.login-subtitle {
+    text-align: center;
+    color: var(--slate-500);
+    font-size: 0.875rem;
+    font-weight: 400;
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+/* ── Form card ── */
+div[data-testid="stForm"] {
+    background: var(--ink-800) !important;
+    border: 1px solid var(--slate-300) !important;
+    padding: 2rem !important;
+    border-radius: 16px !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.40) !important;
+    backdrop-filter: none !important;
+}
+
+/* ── Labels ── */
+.stTextInput label {
+    color: var(--slate-500) !important;
+    font-family: 'Space Mono', monospace !important;
+    font-size: 0.6rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.13em !important;
+}
+
+/* ── Inputs ── */
+.stTextInput input {
+    background: var(--ink-950) !important;
+    color: #ffffff !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--slate-300) !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 0.875rem !important;
+    height: 44px !important;
+    transition: border-color 0.15s, box-shadow 0.15s !important;
+}
+
+.stTextInput input:focus {
+    border-color: var(--mint-400) !important;
+    box-shadow: 0 0 0 3px rgba(47,255,160,0.10) !important;
+    outline: none !important;
+}
+
+.stTextInput input::placeholder {
+    color: var(--slate-400) !important;
+}
+
+/* ── Botão ── */
+.stButton button,
+div[data-testid="stFormSubmitButton"] button {
+    width: 100% !important;
+    height: 46px !important;
+    border-radius: 8px !important;
+    background: var(--mint-400) !important;
+    color: var(--ink-950) !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.875rem !important;
+    letter-spacing: 0.01em !important;
+    border: none !important;
+    margin-top: 10px !important;
+    transition: all 0.15s ease !important;
+}
+
+.stButton button:hover,
+div[data-testid="stFormSubmitButton"] button:hover {
+    background: var(--mint-300) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* ── Alert de erro ── */
+[data-testid="stAlert"] {
+    background: rgba(255,107,107,0.07) !important;
+    border: 1px solid rgba(255,107,107,0.20) !important;
+    border-radius: 10px !important;
+    color: #FF9E9E !important;
+    margin-top: 1rem !important;
+}
+
+[data-testid="stAlert"] p {
+    color: #FF9E9E !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--slate-300); border-radius: 4px; }
+</style>
+""", unsafe_allow_html=True)
 
     st.markdown('<div class="login-logo">🔐</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-title">Sistema de Bonificação</div>', unsafe_allow_html=True)
-    st.markdown('<div class="login-subtitle">Acesso restrito</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-tag">Acesso restrito</div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-title">Sistema de<br><em>Bonificação</em></div>', unsafe_allow_html=True)
+    st.markdown('<div class="login-subtitle">Faça login para continuar.</div>', unsafe_allow_html=True)
 
     with st.form("form_login"):
         usuario = st.text_input("Usuário")

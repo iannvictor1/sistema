@@ -12,6 +12,10 @@ from tabs.fechamento import render_fechamento
 from tabs.regras_negocio import render_regras
 from tabs.login import tela_login
 import hmac
+from tabs.dashboard import render_dashboard
+from PIL import Image
+import base64
+from io import BytesIO
 
 st.set_page_config(
     page_title="Sistema de Bonificação",
@@ -23,15 +27,16 @@ tela_login()
 
 aplicar_estilos()
 
-st.markdown("""
+st.markdown(f"""
 <div class="header-wrap">
-    <div class="header-eyebrow">Gestão de Desempenho</div>
-    <div class="header-title">Sistema de <span>Bonificação</span></div>
+    <div class="header-eyebrow">Sistema de Bônus</div>
+    <div class="header-title">Performance <span>& Resultados</span></div>
     <div class="header-line"></div>
 </div>
 """, unsafe_allow_html=True)
 
-aba1, aba2, aba3, aba4, aba5, aba6, aba7 = st.tabs([
+aba0, aba1, aba2, aba3, aba4, aba5, aba6, aba7 = st.tabs([
+    "📊 Dashboard",
     "＋  Cadastrar Funcionário",
     "≡  Listar Funcionários",
     "↑  Lançamentos",
@@ -40,6 +45,9 @@ aba1, aba2, aba3, aba4, aba5, aba6, aba7 = st.tabs([
     "✦  Fechamento Mensal",
     "📘 Regras de Negócio"
 ])
+
+with aba0:
+    render_dashboard(API_URL)
 
 with aba1:
     render_cadastro(API_URL)

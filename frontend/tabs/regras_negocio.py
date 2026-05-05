@@ -26,7 +26,7 @@ def render_regras(API_URL: str):
         <br>• Retornos: desconto de <span class="valor-bonus">R$ 0,60</span> por retorno
     </div>
     
-    <div class="car-item">
+    <div class="card-item">
         <strong>Nota de desempenho</strong><br>
         A nota altera o valor da bonificação semanal:
         <br>• Nota 5: 100%
