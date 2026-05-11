@@ -3,6 +3,14 @@ import streamlit as st
 from datetime import date
 
 
+def _lancamento_pertence_ao_mes(lancamento: dict, mes_api: str, mes_semana: str) -> bool:
+    data_lancamento = lancamento.get("data_lancamento")
+    if data_lancamento and str(data_lancamento).startswith(mes_api):
+        return True
+
+    return mes_semana in lancamento.get("semana", "")
+
+
 def render_dashboard(API_URL: str):
     st.subheader("Dashboard do Mês")
 
@@ -20,12 +28,21 @@ def render_dashboard(API_URL: str):
         resp_lancamentos = requests.get(f"{API_URL}/lancamentos-semanais", timeout=10)
         resp_funcionarios = requests.get(f"{API_URL}/funcionarios", timeout=10)
 
-        if (
-            resp_fechamento.status_code != 200
-            or resp_lancamentos.status_code != 200
-            or resp_funcionarios.status_code != 200
-        ):
+        respostas = {
+            "fechamento": resp_fechamento,
+            "lançamentos": resp_lancamentos,
+            "funcionários": resp_funcionarios,
+        }
+        erros = [
+            f"{nome}: HTTP {resp.status_code} - {resp.text[:250]}"
+            for nome, resp in respostas.items()
+            if resp.status_code != 200
+        ]
+
+        if erros:
             st.error("Erro ao carregar dados do dashboard.")
+            with st.expander("Detalhes técnicos"):
+                st.code("\n".join(erros))
             return
 
         fechamento = resp_fechamento.json()
@@ -47,7 +64,7 @@ def render_dashboard(API_URL: str):
 
         lancamentos_mes = [
             l for l in lancamentos
-            if mes_ano in l.get("semana", "")
+            if _lancamento_pertence_ao_mes(l, mes, mes_ano)
         ]
 
         if funcionario_filtro_id is not None:
@@ -138,3 +155,7 @@ def render_dashboard(API_URL: str):
 
     except requests.exceptions.ConnectionError:
         st.error("Não foi possível conectar ao backend.")
+    except requests.exceptions.RequestException as erro:
+        st.error("Erro ao carregar dados do dashboard.")
+        with st.expander("Detalhes técnicos"):
+            st.code(str(erro))

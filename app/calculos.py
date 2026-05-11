@@ -10,6 +10,10 @@ def recebe_bonus_entrega(tipo_entrega: str) -> bool:
     return tipo in tipos_validos
 
 
+def normalizar_turno(turno: str) -> str:
+    return (turno or "").strip().lower()
+
+
 def calcular_bonus(
     tipo_entrega: str,
     pedidos_separados: int,
@@ -18,7 +22,8 @@ def calcular_bonus(
     entregas: int,
     retornos: int,
     nota: int,
-    penalidade: bool
+    penalidade: bool,
+    turno: str = "Não informado"
 ) -> float:
     valor_entregas = 0.0
     perda_retornos = 0.0
@@ -27,12 +32,21 @@ def calcular_bonus(
         valor_entregas = entregas * 0.30
         perda_retornos = retornos * 0.60
 
-    ganho = (
-        pedidos_separados * 0.10 +
-        pedidos_carregados * 0.10 +
-        toneladas * 2.00 +
-        valor_entregas
-    )
+    if recebe_bonus_entrega(tipo_entrega):
+        ganho = valor_entregas
+    else:
+        turno_normalizado = normalizar_turno(turno)
+
+        if turno_normalizado in {"manhã", "manha", "tarde"}:
+            ganho = pedidos_separados * 0.10 + toneladas * 2.00
+        elif turno_normalizado == "noite":
+            ganho = pedidos_carregados * 0.10
+        else:
+            ganho = (
+                pedidos_separados * 0.10 +
+                pedidos_carregados * 0.10 +
+                toneladas * 2.00
+            )
 
     if penalidade:
         ganho *= 0.5

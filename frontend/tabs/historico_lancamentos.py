@@ -2,6 +2,7 @@ import requests
 import streamlit as st
 from datetime import date
 from utils import API_URL
+from utils import gerar_semana_mes
 
 
 def render_historico_lancamentos(API_URL: str):
@@ -10,10 +11,20 @@ def render_historico_lancamentos(API_URL: str):
     col_filtro, col_btn = st.columns([2, 1])
 
     with col_filtro:
+        col_mes, col_dia = st.columns(2)
+
+    with col_mes:
         data_filtro = st.date_input(
             "Filtrar por mês",
             value=date.today(),
             key="filtro_mes_lancamentos"
+        )
+
+    with col_dia:
+        filtro_data = st.date_input(
+            "Filtrar por dia",
+            value=None,
+            key="filtro_data_lancamentos"
         )
 
     with col_btn:
@@ -33,10 +44,23 @@ def render_historico_lancamentos(API_URL: str):
 
             mapa_funcionarios = {f["id"]: f for f in funcionarios}
 
-            lancamentos_filtrados = [
-                l for l in lancamentos
-                if mes_ano in l.get("semana", "")
-            ]
+            lancamentos_filtrados = []
+
+            for l in lancamentos:
+                semana = l.get("semana", "")
+                data_lancamento = l.get("data_lancamento")
+
+                corresponde_mes = mes_ano in semana
+
+                corresponde_dia = True
+
+                if filtro_data:
+                    corresponde_dia = (
+                        data_lancamento == filtro_data.strftime("%Y-%m-%d")
+                    )
+
+                if corresponde_mes and corresponde_dia:
+                    lancamentos_filtrados.append(l)
 
             if not lancamentos_filtrados:
                 st.info(f"Nenhum lançamento encontrado para {mes_ano}.")
@@ -77,64 +101,93 @@ def render_historico_lancamentos(API_URL: str):
                 """, unsafe_allow_html=True)
 
                 with st.expander(f"Editar lançamento #{l['id']} - {nome_funcionario}"):
-                    nova_semana = st.text_input(
-                        "Semana",
-                        value=l["semana"],
-                        key=f"edit_semana_{l['id']}"
-                    )
+                    if tipo_lancamento == "diario":
 
-                    col1, col2, col3 = st.columns(3)
-
-                    with col1:
-                        novos_pedidos_sep = st.number_input(
-                            "Pedidos separados",
-                            min_value=0,
-                            value=int(l["pedidos_separados"]),
-                            key=f"edit_sep_{l['id']}"
+                        nova_data = st.date_input(
+                            "Data do lançamento",
+                            value=date.fromisoformat(l["data_lancamento"])
+                            if l.get("data_lancamento")
+                            else date.today(),
+                            key=f"edit_data_{l['id']}"
                         )
 
-                        novos_pedidos_car = st.number_input(
-                            "Pedidos carregados",
-                            min_value=0,
-                            value=int(l["pedidos_carregados"]),
-                            key=f"edit_car_{l['id']}"
+                        nova_semana = gerar_semana_mes(nova_data)
+
+                    else:
+
+                        nova_semana = st.text_input(
+                            "Semana",
+                            value=l["semana"],
+                            key=f"edit_semana_{l['id']}"
                         )
 
-                    with col2:
-                        novas_toneladas = st.number_input(
-                            "Toneladas",
-                            min_value=0.0,
-                            value=float(l["toneladas"]),
-                            step=0.1,
-                            key=f"edit_ton_{l['id']}"
-                        )
+                    recebe_entrega = tipo_entrega in ["Motorista", "Ajudante de motorista"]
 
-                        if tipo_entrega in ["Motorista", "Ajudante de motorista"]:
+                    if recebe_entrega:
+
+                        novos_pedidos_sep = 0
+                        novos_pedidos_car = 0
+                        novas_toneladas = 0.0
+
+                        col1, col2 = st.columns(2)
+
+                        with col1:
                             novas_entregas = st.number_input(
                                 "Entregas",
                                 min_value=0,
                                 value=int(l["entregas"]),
                                 key=f"edit_entregas_{l['id']}"
                             )
-                        else:
-                            novas_entregas = 0
-                            st.info("Este funcionário não recebe bonificação por entregas.")
 
-                    with col3:
-                        novos_retornos = st.number_input(
-                            "Retornos",
-                            min_value=0,
-                            value=int(l["retornos"]),
-                            key=f"edit_retornos_{l['id']}"
+                        with col2:
+                            novos_retornos = st.number_input(
+                                "Retornos",
+                                min_value=0,
+                                value=int(l["retornos"]),
+                                key=f"edit_retornos_{l['id']}"
+                            )
+
+                        nova_nota = 5
+
+                    else:
+
+                        novas_entregas = 0
+                        novos_retornos = 0
+
+                        col1, col2, col3, col4 = st.columns(4)
+
+                        with col1:
+                            novos_pedidos_sep = st.number_input(
+                                "Pedidos separados",
+                                min_value=0,
+                                value=int(l["pedidos_separados"]),
+                                key=f"edit_sep_{l['id']}"
+                            )
+
+                        with col2:
+                            novos_pedidos_car = st.number_input(
+                                "Pedidos carregados",
+                                min_value=0,
+                                value=int(l["pedidos_carregados"]),
+                                key=f"edit_car_{l['id']}"
+                            )
+
+                        with col3:
+                            novas_toneladas = st.number_input(
+                                "Toneladas",
+                                min_value=0.0,
+                                value=float(l["toneladas"]),
+                                step=0.1,
+                                key=f"edit_ton_{l['id']}"
+                            )
+
+                        with col4:
+                            nova_nota = st.selectbox(
+                                "Nota",
+                                [1, 2, 3, 4, 5],
+                                index=[1, 2, 3, 4, 5].index(int(l["nota"])),
+                                key=f"edit_nota_{l['id']}"
                         )
-
-                        nova_nota = st.selectbox(
-                            "Nota",
-                            [1, 2, 3, 4, 5],
-                            index=[1, 2, 3, 4, 5].index(int(l["nota"])),
-                            key=f"edit_nota_{l['id']}"
-                        )
-
                     nova_penalidade = st.checkbox(
                         "Houve penalidade de 50%",
                         value=bool(l["penalidade"]),
@@ -142,6 +195,7 @@ def render_historico_lancamentos(API_URL: str):
                     )
 
                     novo_motivo = None
+
                     if nova_penalidade:
                         motivos = [
                             "Erro de carregamento",
@@ -185,6 +239,7 @@ def render_historico_lancamentos(API_URL: str):
                             else:
                                 payload = {
                                     "semana": nova_semana,
+                                    "data_lancamento": str(nova_data) if tipo_lancamento == "diario" else l.get("data_lancamento"),
                                     "pedidos_separados": novos_pedidos_sep,
                                     "pedidos_carregados": novos_pedidos_car,
                                     "toneladas": novas_toneladas,

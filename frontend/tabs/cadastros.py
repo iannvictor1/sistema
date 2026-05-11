@@ -1,6 +1,7 @@
 import requests
 import streamlit as st
 
+
 def render_cadastro(API_URL: str):
     st.subheader("Cadastro de Funcionário")
 
@@ -14,27 +15,43 @@ def render_cadastro(API_URL: str):
             key="cad_tipo_entrega"
         )
 
+        turno = st.selectbox(
+            "Turno",
+            ["Manhã", "Tarde", "Noite"],
+            key="cad_turno"
+        )
+
         ativo = st.checkbox("Ativo", value=True, key="cad_ativo")
 
         salvar = st.form_submit_button("Salvar funcionário")
 
         if salvar:
-            if not nome.strip() or not cargo.strip():
+            nome_limpo = nome.strip()
+            cargo_limpo = cargo.strip()
+
+            if not nome_limpo or not cargo_limpo:
                 st.error("Preencha nome e cargo.")
-            else:
-                payload = {
-                    "nome": nome.strip(),
-                    "cargo": cargo.strip(),
-                    "ativo": ativo,
-                    "tipo_entrega": tipo_entrega
-                }
+                return
 
-                try:
-                    response = requests.post(f"{API_URL}/funcionarios", json=payload, timeout=10)
+            payload = {
+                "nome": nome_limpo,
+                "cargo": cargo_limpo,
+                "ativo": ativo,
+                "tipo_entrega": tipo_entrega,
+                "turno": turno
+            }
 
-                    if response.status_code == 200:
-                        st.success("Funcionário cadastrado com sucesso.")
-                    else:
-                        st.error(f"Erro ao cadastrar: {response.text}")
-                except requests.exceptions.ConnectionError:
-                    st.error("Não foi possível conectar ao backend. Verifique se o FastAPI está rodando.")
+            try:
+                response = requests.post(
+                    f"{API_URL}/funcionarios",
+                    json=payload,
+                    timeout=10
+                )
+
+                if response.status_code == 200:
+                    st.success(f"Funcionário {nome_limpo} cadastrado com sucesso.")
+                else:
+                    st.error(f"Erro ao cadastrar: {response.text}")
+
+            except requests.exceptions.ConnectionError:
+                st.error("Não foi possível conectar ao backend. Verifique se o FastAPI está rodando.")

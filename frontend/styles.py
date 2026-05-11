@@ -43,8 +43,25 @@ footer { visibility: hidden !important; }
 /* ===== RESET E TIPOGRAFIA ===== */
 *, *::before, *::after { box-sizing: border-box; }
 
-*, html, body, [class*="css"] {
+html, body, .stApp, [class*="css"] {
     font-family: 'Space Grotesk', sans-serif !important;
+}
+
+/* ===== CORRIGE ÍCONES NATIVOS DO STREAMLIT ===== */
+span[data-testid="stIconMaterial"],
+[data-testid="stIconMaterial"],
+.material-symbols-rounded,
+.material-symbols-outlined,
+.material-icons {
+    font-family: 'Material Symbols Rounded' !important;
+    font-weight: normal !important;
+    font-style: normal !important;
+    font-size: 1.25rem !important;
+    line-height: 1 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    white-space: nowrap !important;
+    direction: ltr !important;
 }
 
 html, body, .stApp {
@@ -242,14 +259,30 @@ label,
 .stTextInput label,
 .stNumberInput label,
 .stSelectbox label,
-.stDateInput label,
-.stCheckbox label {
+.stDateInput label {
     color: var(--slate-500) !important;
     font-size: 0.625rem !important;
     font-weight: 700 !important;
     font-family: 'Space Mono', monospace !important;
     text-transform: uppercase !important;
     letter-spacing: 0.13em !important;
+}
+
+/* ===== CHECKBOX ===== */
+.stCheckbox label,
+.stCheckbox label span,
+[data-testid="stCheckbox"] label,
+[data-testid="stCheckbox"] span {
+    color: #FFFFFF !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    letter-spacing: 0.02em !important;
+    text-transform: none !important;
+}
+
+[data-testid="stCheckbox"] {
+    margin-top: 8px !important;
 }
 
 /* ===== INPUTS ===== */
@@ -327,17 +360,21 @@ label,
 }
 
 /* ===== CARDS / EXPANDERS ===== */
-[data-testid="stForm"],
-.card-item,
-[data-testid="stExpander"] {
+.card-item {
     background: var(--ink-800) !important;
     border: 1px solid var(--border) !important;
     border-radius: 12px !important;
-    padding: 1.375rem 1.25rem !important;
+    padding: 1.25rem 1.4rem !important;
+    margin: 0 0 0.75rem 0 !important;
     backdrop-filter: none !important;
 }
 
-.card-item strong { color: white; }
+.card-item strong {
+    color: white !important;
+}
+[data-testid="stExpander"] {
+    margin-bottom: 1.25rem !important;
+}
 
 /* ===== BADGES ===== */
 .badge-sim,
@@ -516,6 +553,46 @@ hr {
         text-align: left;
         width: 100%;
     }
+}
+
+/* ===== EXPANDER CORRIGIDO ===== */
+[data-testid="stExpander"] {
+    background: var(--ink-800) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+[data-testid="stExpander"] details {
+    background: transparent !important;
+}
+
+[data-testid="stExpander"] summary {
+    color: #FFFFFF !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+    padding: 14px 18px !important;
+    min-height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+[data-testid="stExpander"] summary p {
+    color: #FFFFFF !important;
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+}
+
+[data-testid="stExpander"] div[data-testid="stExpanderDetails"] {
+    padding: 18px !important;
+    border-top: 1px solid var(--border) !important;
 }
 </style>
 """, unsafe_allow_html=True)

@@ -8,6 +8,7 @@ class FuncionarioCreate(BaseModel):
     cargo: str
     ativo: bool = True
     tipo_entrega: str
+    turno: str = "Não informado"
 
 class FuncionarioResponse(BaseModel):
     id: int
@@ -15,9 +16,17 @@ class FuncionarioResponse(BaseModel):
     cargo: str
     ativo: bool
     tipo_entrega: str
+    turno: str = "Não informado"
 
     class Config:
         from_attributes = True
+
+class FuncionarioUpdate(BaseModel):
+    nome: str
+    cargo: str
+    ativo: bool = True
+    tipo_entrega: str
+    turno: str = "Não informado"
 
 class LancamentoSemanalCreate(BaseModel):
     funcionario_id: int
@@ -33,6 +42,19 @@ class LancamentoSemanalCreate(BaseModel):
     nota: int
     penalidade: bool = False
     motivo_penalidade: str | None = None
+
+
+class LancamentoMensalCreate(BaseModel):
+    mes: str
+    filtro_turno: str
+    tipo_funcionario: str
+    usuario_lancamento: Optional[str] = None
+    pedidos_separados: int = 0
+    pedidos_carregados: int = 0
+    toneladas: float = 0
+    entregas: int = 0
+    retornos: int = 0
+    notas: dict[int, int]
 
 
 class LancamentoSemanalResponse(BaseModel):
@@ -60,6 +82,7 @@ class LancamentoSemanalResponse(BaseModel):
 
 class LancamentoSemanalUpdate(BaseModel):
     semana: str
+    data_lancamento: Optional[date] = None
     pedidos_separados: int = 0
     pedidos_carregados: int = 0
     toneladas: float = 0
@@ -73,6 +96,9 @@ class FrequenciaMensalCreate(BaseModel):
     funcionario_id: int
     mes: str
     ausencias: int
+    data_falta: Optional[date] = None
+    tipo_falta: str | None = None
+    status_mes: str = "Normal"
 
 
 class FrequenciaMensalResponse(BaseModel):
@@ -80,6 +106,9 @@ class FrequenciaMensalResponse(BaseModel):
     funcionario_id: int
     mes: str
     ausencias: int
+    data_falta: Optional[date] = None
+    tipo_falta: str | None = None
+    status_mes: str = "Normal"
 
     class Config:
         from_attributes = True

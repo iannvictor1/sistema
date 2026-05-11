@@ -1,5 +1,10 @@
 import streamlit as st
 import hmac
+import base64
+import hashlib
+import json
+import os
+import time
 
 USUARIOS = {
     "admin": "8599256",
@@ -8,6 +13,50 @@ USUARIOS = {
     "paulo": "Cempaulo123@",
     "romario": "Cemromario123@"
 }
+
+LOGIN_SECRET = os.getenv("LOGIN_SECRET", "bonificacao-system-local-secret")
+TOKEN_DURACAO_SEGUNDOS = 60 * 60 * 12
+
+
+def criar_token_login(usuario: str) -> str:
+    payload = {
+        "usuario": usuario,
+        "exp": int(time.time()) + TOKEN_DURACAO_SEGUNDOS,
+    }
+    payload_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    payload_b64 = base64.urlsafe_b64encode(payload_bytes).decode("ascii").rstrip("=")
+    assinatura = hmac.new(
+        LOGIN_SECRET.encode("utf-8"),
+        payload_b64.encode("ascii"),
+        hashlib.sha256
+    ).hexdigest()
+    return f"{payload_b64}.{assinatura}"
+
+
+def validar_token_login(token: str) -> str | None:
+    try:
+        payload_b64, assinatura_recebida = token.split(".", 1)
+        assinatura_esperada = hmac.new(
+            LOGIN_SECRET.encode("utf-8"),
+            payload_b64.encode("ascii"),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(assinatura_recebida, assinatura_esperada):
+            return None
+
+        padding = "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + padding))
+        usuario = payload.get("usuario")
+        exp = int(payload.get("exp", 0))
+
+        if exp < int(time.time()) or usuario not in USUARIOS:
+            return None
+
+        return usuario
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+
 
 def verificar_login(usuario: str, senha: str) -> bool:
     senha_correta = USUARIOS.get(usuario)
@@ -19,10 +68,22 @@ def tela_login():
     if "logado" not in st.session_state:
         st.session_state["logado"] = False
 
+    token = st.query_params.get("auth")
+    if not st.session_state["logado"] and token:
+        usuario_token = validar_token_login(token)
+        if usuario_token:
+            st.session_state["logado"] = True
+            st.session_state["usuario"] = usuario_token
+        else:
+            if "auth" in st.query_params:
+                del st.query_params["auth"]
+
     if st.session_state["logado"]:
         with st.sidebar:
             st.success(f"Logado como: {st.session_state.get('usuario', '')}")
             if st.button("Sair"):
+                if "auth" in st.query_params:
+                    del st.query_params["auth"]
                 st.session_state.clear()
                 st.rerun()
         return
@@ -240,6 +301,7 @@ div[data-testid="stFormSubmitButton"] button:hover {
         if verificar_login(usuario, senha):
             st.session_state["logado"] = True
             st.session_state["usuario"] = usuario
+            st.query_params["auth"] = criar_token_login(usuario)
             st.rerun()
         else:
             st.error("Usuário ou senha inválidos.")

@@ -17,7 +17,12 @@ def render_fechamento(API_URL: str):
                 if dados:
                     for d in dados:
                         elegivel = d["elegivel"]
-                        status_badge = '<span class="badge-elegivel">Elegível</span>' if elegivel else '<span class="badge-eliminado">Eliminado por ausência</span>'
+                        if d.get("status_mes") == "Férias":
+                            status_badge = '<span class="badge-pendente">Férias</span>'
+                        elif elegivel:
+                            status_badge = '<span class="badge-elegivel">Elegível</span>'
+                        else:
+                            status_badge = '<span class="badge-eliminado">Eliminado por ausência</span>'
                         bonus_class = "valor-bonus" if elegivel else ""
 
                         st.markdown(f"""

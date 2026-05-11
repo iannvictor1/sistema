@@ -1,13 +1,16 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from .database import Base, engine, SessionLocal
 from .models import Funcionario, LancamentoSemanal, FrequenciaMensal
 from .schemas import (
     FuncionarioCreate,
     FuncionarioResponse,
+    FuncionarioUpdate,
     LancamentoSemanalCreate,
+    LancamentoMensalCreate,
     LancamentoSemanalResponse,
     FrequenciaMensalCreate,
     FrequenciaMensalResponse,
@@ -16,13 +19,92 @@ from .schemas import (
 from .calculos import calcular_bonus, calcular_bonus_mensal
 from .export_excel import exportar_fechamento_excel
 from datetime import date
+import unicodedata
 
 app = FastAPI(title="Sistema de Bonificação")
 
 Base.metadata.create_all(bind=engine)
 
+
+def garantir_colunas_frequencia():
+    if engine.dialect.name != "sqlite":
+        return
+
+    with engine.begin() as conn:
+        colunas = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(frequencias_mensais)"))
+        }
+
+        if "status_mes" not in colunas:
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN status_mes TEXT DEFAULT 'Normal'"))
+        if "data_falta" not in colunas:
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN data_falta DATE"))
+        if "tipo_falta" not in colunas:
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN tipo_falta TEXT"))
+
+
+garantir_colunas_frequencia()
+
+
+def garantir_colunas_funcionario():
+    if engine.dialect.name != "sqlite":
+        return
+
+    with engine.begin() as conn:
+        colunas = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(funcionarios)"))
+        }
+
+        if "turno" not in colunas:
+            conn.execute(text("ALTER TABLE funcionarios ADD COLUMN turno TEXT DEFAULT 'Não informado'"))
+
+
+garantir_colunas_funcionario()
+
 def formatar_mes_para_semana(mes: str) -> str:
     return f"{mes[5:7]}/{mes[:4]}"
+
+
+def lancamento_pertence_ao_mes(lancamento: LancamentoSemanal, mes: str, mes_formatado: str) -> bool:
+    if lancamento.data_lancamento and lancamento.data_lancamento.strftime("%Y-%m") == mes:
+        return True
+
+    return mes_formatado in (lancamento.semana or "")
+
+
+def resumir_frequencias(frequencias: list[FrequenciaMensal]) -> tuple[int, str]:
+    ausencias = sum(f.ausencias or 0 for f in frequencias)
+
+    if ausencias > 0:
+        return ausencias, "Normal"
+
+    if any(f.status_mes == "Férias" for f in frequencias):
+        return 0, "Férias"
+
+    return 0, "Normal"
+
+
+def normalizar_texto(valor: str) -> str:
+    texto = (valor or "").strip().lower()
+    return "".join(
+        char for char in unicodedata.normalize("NFKD", texto)
+        if not unicodedata.combining(char)
+    )
+
+
+def turnos_do_filtro(filtro_turno: str) -> set[str]:
+    if normalizar_texto(filtro_turno) == "manha e tarde":
+        return {"manha", "tarde"}
+    return {normalizar_texto(filtro_turno)}
+
+
+def funcionario_aplicavel_tipo(funcionario: Funcionario, tipo_funcionario: str) -> bool:
+    if normalizar_texto(tipo_funcionario) == "funcionario normal":
+        return normalizar_texto(funcionario.tipo_entrega) in {"", "nao se aplica", "n?o se aplica"}
+    return normalizar_texto(funcionario.tipo_entrega) == normalizar_texto(tipo_funcionario)
+
 
 def get_db():
     db = SessionLocal()
@@ -55,7 +137,8 @@ def criar_funcionario(funcionario: FuncionarioCreate, db: Session = Depends(get_
         nome=funcionario.nome,
         cargo=funcionario.cargo,
         ativo=funcionario.ativo,
-        tipo_entrega=funcionario.tipo_entrega
+        tipo_entrega=funcionario.tipo_entrega,
+        turno=funcionario.turno
     )
     db.add(novo)
     db.commit()
@@ -66,6 +149,32 @@ def criar_funcionario(funcionario: FuncionarioCreate, db: Session = Depends(get_
 @app.get("/funcionarios", response_model=list[FuncionarioResponse])
 def listar_funcionarios(db: Session = Depends(get_db)):
     return db.query(Funcionario).order_by(Funcionario.nome).all()
+
+@app.put("/funcionarios/{funcionario_id}", response_model=FuncionarioResponse)
+def editar_funcionario(
+    funcionario_id: int,
+    dados: FuncionarioUpdate,
+    db: Session = Depends(get_db)
+):
+    funcionario = (
+        db.query(Funcionario)
+        .filter(Funcionario.id == funcionario_id)
+        .first()
+    )
+
+    if not funcionario:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
+
+    funcionario.nome = dados.nome
+    funcionario.cargo = dados.cargo
+    funcionario.ativo = dados.ativo
+    funcionario.tipo_entrega = dados.tipo_entrega
+    funcionario.turno = dados.turno
+
+    db.commit()
+    db.refresh(funcionario)
+
+    return funcionario
 
 
 @app.post("/lancamentos-semanais", response_model=LancamentoSemanalResponse)
@@ -98,7 +207,8 @@ def criar_lancamento_semanal(
         entregas=lancamento.entregas,
         retornos=lancamento.retornos,
         nota=lancamento.nota,
-        penalidade=lancamento.penalidade
+        penalidade=lancamento.penalidade,
+        turno=funcionario.turno
     )
 
     novo = LancamentoSemanal(
@@ -164,10 +274,12 @@ def editar_lancamento_semanal(
         entregas=dados.entregas,
         retornos=dados.retornos,
         nota=dados.nota,
-        penalidade=dados.penalidade
+        penalidade=dados.penalidade,
+        turno=funcionario.turno
     )
         
     lancamento.semana = dados.semana
+    lancamento.data_lancamento = dados.data_lancamento
     lancamento.pedidos_separados = dados.pedidos_separados
     lancamento.pedidos_carregados = dados.pedidos_carregados
     lancamento.toneladas = dados.toneladas
@@ -181,6 +293,85 @@ def editar_lancamento_semanal(
     db.commit()
     db.refresh(lancamento)
     return lancamento
+
+
+@app.post("/lancamentos-mensais", response_model=list[LancamentoSemanalResponse])
+def criar_lancamento_mensal(
+    lancamento: LancamentoMensalCreate,
+    db: Session = Depends(get_db)
+):
+    turnos = turnos_do_filtro(lancamento.filtro_turno)
+    funcionarios = (
+        db.query(Funcionario)
+        .filter(Funcionario.ativo == True)
+        .order_by(Funcionario.nome)
+        .all()
+    )
+    funcionarios_aplicaveis = [
+        funcionario for funcionario in funcionarios
+        if normalizar_texto(funcionario.turno) in turnos
+        and funcionario_aplicavel_tipo(funcionario, lancamento.tipo_funcionario)
+    ]
+
+    if not funcionarios_aplicaveis:
+        raise HTTPException(status_code=400, detail="Nenhum funcionário aplicável encontrado para os filtros.")
+
+    total_funcionarios = len(funcionarios_aplicaveis)
+    semana = f"Mensal - {lancamento.mes[5:7]}/{lancamento.mes[:4]}"
+    data_lancamento = date.fromisoformat(f"{lancamento.mes}-01")
+
+    pedidos_separados = lancamento.pedidos_separados / total_funcionarios
+    pedidos_carregados = lancamento.pedidos_carregados / total_funcionarios
+    toneladas = lancamento.toneladas / total_funcionarios
+    entregas = lancamento.entregas / total_funcionarios
+    retornos = lancamento.retornos / total_funcionarios
+
+    criados = []
+
+    for funcionario in funcionarios_aplicaveis:
+        nota = lancamento.notas.get(funcionario.id)
+        if nota not in {1, 2, 3, 4, 5}:
+            raise HTTPException(status_code=400, detail=f"Informe nota válida para {funcionario.nome}.")
+
+        bonus = calcular_bonus(
+            tipo_entrega=funcionario.tipo_entrega,
+            pedidos_separados=pedidos_separados,
+            pedidos_carregados=pedidos_carregados,
+            toneladas=toneladas,
+            entregas=entregas,
+            retornos=retornos,
+            nota=nota,
+            penalidade=False,
+            turno=funcionario.turno
+        )
+
+        novo = LancamentoSemanal(
+            funcionario_id=funcionario.id,
+            semana=semana,
+            tipo_lancamento="mensal",
+            data_lancamento=data_lancamento,
+            data_registro=date.today(),
+            usuario_lancamento=lancamento.usuario_lancamento,
+            pedidos_separados=round(pedidos_separados),
+            pedidos_carregados=round(pedidos_carregados),
+            toneladas=round(toneladas, 3),
+            entregas=round(entregas),
+            retornos=round(retornos),
+            nota=nota,
+            penalidade=False,
+            motivo_penalidade=None,
+            bonus_calculado=bonus
+        )
+
+        db.add(novo)
+        criados.append(novo)
+
+    db.commit()
+
+    for criado in criados:
+        db.refresh(criado)
+
+    return criados
 
 @app.delete("/lancamentos-semanais/{lancamento_id}")
 def excluir_lancamento_semanal(
@@ -212,17 +403,38 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
 
+    tipos_falta_validos = {"Falta", "Atestado", "Licença legal"}
+
+    if frequencia.status_mes == "Férias":
+        frequencia.ausencias = 0
+        frequencia.data_falta = None
+        frequencia.tipo_falta = None
+    elif frequencia.ausencias > 0:
+        if not frequencia.data_falta:
+            raise HTTPException(status_code=400, detail="Informe o dia da falta.")
+        if frequencia.tipo_falta not in tipos_falta_validos:
+            raise HTTPException(status_code=400, detail="Informe um tipo de falta válido.")
+        frequencia.mes = frequencia.data_falta.strftime("%Y-%m")
+    else:
+        frequencia.data_falta = None
+        frequencia.tipo_falta = None
+
     existente = (
         db.query(FrequenciaMensal)
         .filter(
             FrequenciaMensal.funcionario_id == frequencia.funcionario_id,
-            FrequenciaMensal.mes == frequencia.mes
+            FrequenciaMensal.mes == frequencia.mes,
+            FrequenciaMensal.data_falta == frequencia.data_falta
         )
         .first()
     )
 
     if existente:
         existente.ausencias = frequencia.ausencias
+        existente.status_mes = frequencia.status_mes
+        existente.data_falta = frequencia.data_falta
+        existente.tipo_falta = frequencia.tipo_falta
+
         db.commit()
         db.refresh(existente)
         return existente
@@ -230,7 +442,10 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
     nova = FrequenciaMensal(
         funcionario_id=frequencia.funcionario_id,
         mes=frequencia.mes,
-        ausencias=frequencia.ausencias
+        ausencias=frequencia.ausencias,
+        data_falta=frequencia.data_falta,
+        tipo_falta=frequencia.tipo_falta,
+        status_mes=frequencia.status_mes
     )
 
     db.add(nova)
@@ -251,28 +466,36 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
     mes_formatado = formatar_mes_para_semana(mes)
 
     for funcionario in funcionarios:
-        frequencia = (
+        frequencias = (
             db.query(FrequenciaMensal)
             .filter(
                 FrequenciaMensal.funcionario_id == funcionario.id,
                 FrequenciaMensal.mes == mes
             )
-            .first()
-        )
-
-        ausencias = frequencia.ausencias if frequencia else 0
-
-        lancamentos = (
-            db.query(LancamentoSemanal)
-            .filter(
-                LancamentoSemanal.funcionario_id == funcionario.id,
-                LancamentoSemanal.semana.like(f"%{mes_formatado}")
-            )
             .all()
         )
 
-        bonus_final = calcular_bonus_mensal(lancamentos, ausencias)
-        assiduidade = 150.0 if ausencias == 0 else 0.0
+        ausencias, status_mes = resumir_frequencias(frequencias)
+
+        lancamentos_funcionario = (
+            db.query(LancamentoSemanal)
+            .filter(LancamentoSemanal.funcionario_id == funcionario.id)
+            .all()
+        )
+        lancamentos = [
+            lancamento for lancamento in lancamentos_funcionario
+            if lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
+        ]
+
+        if status_mes == "Férias":
+            bonus_final = 0.0
+            assiduidade = 0.0
+            elegivel = True
+            ausencias = 0
+        else:
+            bonus_final = calcular_bonus_mensal(lancamentos, ausencias)
+            assiduidade = 150.0 if ausencias == 0 else 0.0
+            elegivel = ausencias == 0
 
         resultado.append({
             "funcionario_id": funcionario.id,
@@ -283,7 +506,8 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             "quantidade_lancamentos": len(lancamentos),
             "bonus_final": bonus_final,
             "assiduidade": assiduidade,
-            "elegivel": ausencias == 0
+            "elegivel": elegivel,
+            "status_mes": status_mes
         })
 
     return resultado
@@ -296,28 +520,37 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
 
     fechamento = []
     for funcionario in funcionarios:
-        frequencia = (
+        frequencias_funcionario = (
             db.query(FrequenciaMensal)
             .filter(
                 FrequenciaMensal.funcionario_id == funcionario.id,
                 FrequenciaMensal.mes == mes
             )
-            .first()
-        )
-
-        ausencias = frequencia.ausencias if frequencia else 0
-
-        lancamentos_mes = (
-            db.query(LancamentoSemanal)
-            .filter(
-                LancamentoSemanal.funcionario_id == funcionario.id,
-                LancamentoSemanal.semana.like(f"%{mes_formatado}")
-            )
             .all()
         )
 
-        bonus_final = calcular_bonus_mensal(lancamentos_mes, ausencias)
-        assiduidade = 150.0 if ausencias == 0 else 0.0
+        ausencias, status_mes = resumir_frequencias(frequencias_funcionario)
+
+        lancamentos_funcionario = (
+            db.query(LancamentoSemanal)
+            .filter(LancamentoSemanal.funcionario_id == funcionario.id)
+            .all()
+        )
+        lancamentos_mes = [
+            lancamento for lancamento in lancamentos_funcionario
+            if lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
+        ]
+
+        if status_mes == "Férias":
+            bonus_final = 0.0
+            assiduidade = 0.0
+            elegivel = True
+            ausencias = 0
+        
+        else:
+            bonus_final = calcular_bonus_mensal(lancamentos_mes, ausencias)
+            assiduidade = 150.0 if ausencias == 0 else 0.0
+            elegivel = ausencias == 0
 
         fechamento.append({
             "funcionario_id": funcionario.id,
@@ -328,15 +561,18 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
             "quantidade_lancamentos": len(lancamentos_mes),
             "bonus_final": bonus_final,
             "assiduidade": assiduidade,
-            "elegivel": ausencias == 0
+            "elegivel": elegivel,
+            "status_mes": status_mes
         })
 
-    todos_lancamentos = (
+    todos_lancamentos = [
+        lancamento for lancamento in (
         db.query(LancamentoSemanal)
-        .filter(LancamentoSemanal.semana.like(f"%{mes_formatado}"))
         .order_by(LancamentoSemanal.id.desc())
         .all()
-    )
+        )
+        if lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
+    ]
 
     todas_frequencias = (
         db.query(FrequenciaMensal)

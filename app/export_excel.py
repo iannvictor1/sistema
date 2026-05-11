@@ -292,13 +292,22 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     # Aba 4 - Frequência Mensal (RESTAURADA)
     # =========================
     ws_freq = wb.create_sheet("Frequência Mensal")
-    ws_freq.merge_cells("A1:E1")
+    ws_freq.merge_cells("A1:H1")
     ws_freq["A1"] = "Controle de Frequência Mensal"
     ws_freq["A1"].font = fonte_titulo
     ws_freq["A1"].fill = fill_titulo
     ws_freq["A1"].alignment = alinhamento_centro
 
-    headers_freq = ["ID", "Funcionário ID", "Funcionário", "Mês", "Ausências"]
+    headers_freq = [
+    "ID",
+    "Funcionário ID",
+    "Funcionário",
+    "Mês",
+    "Ausências",
+    "Dia da Falta",
+    "Tipo de Falta",
+    "Status do Mês"
+]
 
     for i, valor in enumerate(headers_freq, start=1):
         ws_freq.cell(row=3, column=i, value=valor)
@@ -312,23 +321,30 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_freq.cell(linha, 3, funcionarios_dict.get(f.funcionario_id, "-"))
         ws_freq.cell(linha, 4, f.mes)
         ws_freq.cell(linha, 5, f.ausencias)
+        ws_freq.cell(linha, 6, getattr(f, "data_falta", None))
+        ws_freq.cell(
+            linha,
+            8,
+            getattr(f, "status_mes", "Normal")
+        )
+        ws_freq.cell(linha, 7, getattr(f, "tipo_falta", None) or "-")
 
-        for col in range(1, 6):
+        for col in range(1, 9):
             ws_freq.cell(linha, col).border = borda_fina
 
         linha += 1
 
     ws_freq.freeze_panes = "A4"
-    ws_freq.auto_filter.ref = f"A3:D{max(linha - 1, 3)}"
+    ws_freq.auto_filter.ref = f"A3:H{max(linha - 1, 3)}"
 
     ws_func = wb.create_sheet("Funcionários")
-    ws_func.merge_cells("A1:D1")
+    ws_func.merge_cells("A1:E1")
     ws_func["A1"] = "Base de Funcionários"
     ws_func["A1"].font = fonte_titulo
     ws_func["A1"].fill = fill_titulo
     ws_func["A1"].alignment = alinhamento_centro
 
-    headers_func = ["ID", "Nome", "Cargo", "Ativo"]
+    headers_func = ["ID", "Nome", "Cargo", "Turno", "Ativo"]
 
     for i, valor in enumerate(headers_func, start=1):
         ws_func.cell(row=3, column=i, value=valor)
@@ -340,15 +356,16 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_func.cell(linha, 1, func.id)
         ws_func.cell(linha, 2, func.nome)
         ws_func.cell(linha, 3, func.cargo)
-        ws_func.cell(linha, 4, "Sim" if func.ativo else "Não")
+        ws_func.cell(linha, 4, getattr(func, "turno", "Não informado"))
+        ws_func.cell(linha, 5, "Sim" if func.ativo else "Não")
 
-        for col in range(1, 5):
+        for col in range(1, 6):
             ws_func.cell(linha, col).border = borda_fina
 
         linha += 1
 
     ws_func.freeze_panes = "A4"
-    ws_func.auto_filter.ref = f"A3:D{max(linha - 1, 3)}"
+    ws_func.auto_filter.ref = f"A3:E{max(linha - 1, 3)}"
 
     for worksheet in wb.worksheets:
         auto_ajustar_colunas(worksheet)

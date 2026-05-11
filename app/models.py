@@ -9,6 +9,7 @@ class Funcionario(Base):
     cargo = Column(String, nullable=False)
     ativo = Column(Boolean, default=True)
     tipo_entrega = Column(String, default="Não se aplica")
+    turno = Column(String, default="Não informado")
 
 
 class LancamentoSemanal(Base):
@@ -39,5 +40,8 @@ class FrequenciaMensal(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     funcionario_id = Column(Integer, ForeignKey("funcionarios.id"), nullable=False)
-    mes = Column(String, nullable=False)  # Ex: 2026-04
+    mes = Column(String, nullable=False) 
     ausencias = Column(Integer, default=0)
+    data_falta = Column(Date, nullable=True)
+    tipo_falta = Column(String, nullable=True)
+    status_mes = Column(String, default="Normal")  
