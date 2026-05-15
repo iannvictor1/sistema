@@ -28,14 +28,28 @@ function Restart-OptionalScheduledTask($Name) {
     }
 
     Write-Step "Reiniciando tarefa agendada: $Name"
-    $task = Get-ScheduledTask -TaskName $Name -ErrorAction Stop
+    $task = Get-ScheduledTask | Where-Object { $_.TaskName -eq $Name } | Select-Object -First 1
+
+    if (!$task) {
+        $knownTasks = Get-ScheduledTask |
+            Where-Object { $_.TaskName -like "*Bonificacao*" -or $_.TaskName -like "*Bonificação*" } |
+            Select-Object -ExpandProperty TaskName
+
+        $hint = if ($knownTasks) {
+            " Tarefas parecidas encontradas: $($knownTasks -join ', ')."
+        } else {
+            " Nenhuma tarefa parecida foi encontrada. Crie a tarefa com scripts\criar_tarefa_backend_producao.ps1."
+        }
+
+        throw "Tarefa agendada '$Name' nao encontrada.$hint"
+    }
 
     if ($task.State -eq "Running") {
-        Stop-ScheduledTask -TaskName $Name
+        schtasks.exe /End /TN $task.TaskName | Out-Null
         Start-Sleep -Seconds 2
     }
 
-    Start-ScheduledTask -TaskName $Name
+    schtasks.exe /Run /TN $task.TaskName | Out-Null
 }
 
 function Assert-SupportedPython($PythonExe) {
