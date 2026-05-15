@@ -28,17 +28,19 @@ git push
 .\scripts\atualizar_producao.ps1
 ```
 
-Se o sistema estiver rodando como servico do Windows, informe o nome do servico do backend:
+Se o sistema estiver rodando como tarefa agendada do Windows, informe o nome da tarefa:
 
 ```powershell
-.\scripts\atualizar_producao.ps1 -BackendService "BonificacaoBackend"
+.\scripts\atualizar_producao.ps1 -BackendTask "BonificacaoBackend"
 ```
 
 Para disparar a atualizacao remotamente a partir do computador de desenvolvimento, habilite PowerShell Remoting/WinRM na maquina de producao e execute:
 
 ```powershell
-.\scripts\atualizar_remoto.ps1 -ComputerName "NOME-OU-IP-DA-PRODUCAO" -ProjectDir "C:\bonificacao_system" -BackendService "BonificacaoBackend"
+.\scripts\atualizar_remoto.ps1 -ComputerName "NOME-OU-IP-DA-PRODUCAO" -ProjectDir "C:\bonificacao_system" -BackendTask "BonificacaoBackend"
 ```
+
+Se voce usar servico real do Windows, tambem e possivel reiniciar com `-BackendService "BonificacaoBackend"`.
 
 ## Primeira Instalacao no Computador de Producao
 

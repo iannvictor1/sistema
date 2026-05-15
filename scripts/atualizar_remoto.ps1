@@ -5,6 +5,8 @@ param(
     [string]$ProjectDir = "C:\bonificacao_system",
     [string]$BackendService = "",
     [string]$FrontendService = "",
+    [string]$BackendTask = "",
+    [string]$FrontendTask = "",
     [string]$UserName = ""
 )
 
@@ -16,19 +18,21 @@ if (![string]::IsNullOrWhiteSpace($UserName)) {
 }
 
 $script = {
-    param($RemoteProjectDir, $RemoteBackendService, $RemoteFrontendService)
+    param($RemoteProjectDir, $RemoteBackendService, $RemoteFrontendService, $RemoteBackendTask, $RemoteFrontendTask)
 
     Set-Location -LiteralPath $RemoteProjectDir
     & .\scripts\atualizar_producao.ps1 `
         -ProjectDir $RemoteProjectDir `
         -BackendService $RemoteBackendService `
-        -FrontendService $RemoteFrontendService
+        -FrontendService $RemoteFrontendService `
+        -BackendTask $RemoteBackendTask `
+        -FrontendTask $RemoteFrontendTask
 }
 
 $params = @{
     ComputerName = $ComputerName
     ScriptBlock = $script
-    ArgumentList = @($ProjectDir, $BackendService, $FrontendService)
+    ArgumentList = @($ProjectDir, $BackendService, $FrontendService, $BackendTask, $FrontendTask)
 }
 
 if ($credential) {

@@ -1,7 +1,9 @@
 param(
     [string]$ProjectDir = (Split-Path -Parent $PSScriptRoot),
     [string]$BackendService = "",
-    [string]$FrontendService = ""
+    [string]$FrontendService = "",
+    [string]$BackendTask = "",
+    [string]$FrontendTask = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +20,22 @@ function Restart-OptionalService($Name) {
 
     Write-Step "Reiniciando servico: $Name"
     Restart-Service -Name $Name -Force
+}
+
+function Restart-OptionalScheduledTask($Name) {
+    if ([string]::IsNullOrWhiteSpace($Name)) {
+        return
+    }
+
+    Write-Step "Reiniciando tarefa agendada: $Name"
+    $task = Get-ScheduledTask -TaskName $Name -ErrorAction Stop
+
+    if ($task.State -eq "Running") {
+        Stop-ScheduledTask -TaskName $Name
+        Start-Sleep -Seconds 2
+    }
+
+    Start-ScheduledTask -TaskName $Name
 }
 
 function Assert-SupportedPython($PythonExe) {
@@ -55,6 +73,8 @@ Set-Location -LiteralPath $ProjectDir
 
 Restart-OptionalService -Name $BackendService
 Restart-OptionalService -Name $FrontendService
+Restart-OptionalScheduledTask -Name $BackendTask
+Restart-OptionalScheduledTask -Name $FrontendTask
 
 Write-Host ""
 Write-Host "Atualizacao concluida." -ForegroundColor Green
