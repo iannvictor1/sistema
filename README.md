@@ -94,13 +94,19 @@ Tambem existe um arquivo `.env.example` como modelo. Em producao, crie ou manten
 
 ## Servico do Windows
 
-Para producao, prefira criar um servico chamado `BonificacaoBackend` apontando para:
+Para producao, uma opcao simples sem ferramentas externas e criar uma tarefa agendada do Windows:
+
+```powershell
+.\scripts\criar_tarefa_backend_producao.ps1 -ProjectDir "C:\bonificacao_system"
+```
+
+Execute esse comando em um PowerShell aberto como Administrador. A tarefa se chama `BonificacaoBackend`, inicia junto com o Windows e executa:
 
 ```powershell
 powershell.exe -ExecutionPolicy Bypass -File "C:\bonificacao_system\scripts\iniciar_backend_producao.ps1"
 ```
 
-Ferramentas como NSSM facilitam esse cadastro porque mantem o processo Python como servico e permitem reiniciar automaticamente em caso de falha.
+Se preferir um servico real do Windows, ferramentas como NSSM ou WinSW tambem funcionam, mas nao sao obrigatorias para este sistema.
 
 ## Migrar SQLite para PostgreSQL
 
