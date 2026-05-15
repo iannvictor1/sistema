@@ -174,7 +174,7 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     # Aba 2 - Lançamentos Semanais
     # =========================
     ws_lanc = wb.create_sheet("Lançamentos Semanais")
-    ws_lanc.merge_cells("A1:P1")
+    ws_lanc.merge_cells("A1:Q1")
     ws_lanc["A1"] = "Detalhamento dos Lançamentos Semanais"
     ws_lanc["A1"].font = fonte_titulo
     ws_lanc["A1"].fill = fill_titulo
@@ -220,30 +220,30 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_lanc.cell(linha, 6, getattr(l, "data_registro", None))
         ws_lanc.cell(linha, 7, getattr(l, "data_lancamento", None))
         ws_lanc.cell(linha, 8, getattr(l, "usuario_lancamento", "-"))
-        ws_lanc.cell(linha, 8, l.pedidos_separados)
-        ws_lanc.cell(linha, 9, l.pedidos_carregados)
-        ws_lanc.cell(linha, 10, l.toneladas)
-        ws_lanc.cell(linha, 11, l.entregas)
-        ws_lanc.cell(linha, 12, l.retornos)
-        ws_lanc.cell(linha, 13, l.nota)
-        ws_lanc.cell(linha, 14, "Sim" if l.penalidade else "Não")
-        ws_lanc.cell(linha, 15, l.motivo_penalidade if l.motivo_penalidade else "-")
-        ws_lanc.cell(linha, 16, l.bonus_calculado)
+        ws_lanc.cell(linha, 9, l.pedidos_separados)
+        ws_lanc.cell(linha, 10, l.pedidos_carregados)
+        ws_lanc.cell(linha, 11, l.toneladas)
+        ws_lanc.cell(linha, 12, l.entregas)
+        ws_lanc.cell(linha, 13, l.retornos)
+        ws_lanc.cell(linha, 14, l.nota)
+        ws_lanc.cell(linha, 15, "Sim" if l.penalidade else "Não")
+        ws_lanc.cell(linha, 16, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_lanc.cell(linha, 17, l.bonus_calculado)
 
-        for col in range(1, 17):
+        for col in range(1, 18):
             ws_lanc.cell(linha, col).border = borda_fina
 
-        formatar_moeda(ws_lanc.cell(linha, 16))
+        formatar_moeda(ws_lanc.cell(linha, 17))
         linha += 1
 
     ws_lanc.freeze_panes = "A4"
-    ws_lanc.auto_filter.ref = f"A3:P{max(linha - 1, 3)}"
+    ws_lanc.auto_filter.ref = f"A3:Q{max(linha - 1, 3)}"
 
     # =========================
     # Aba 3 - Lançamentos Diários
     # =========================
     ws_diario = wb.create_sheet("Lançamentos Diários")
-    ws_diario.merge_cells("A1:P1")
+    ws_diario.merge_cells("A1:Q1")
     ws_diario["A1"] = "Detalhamento dos Lançamentos Diários"
     ws_diario["A1"].font = fonte_titulo
     ws_diario["A1"].fill = fill_titulo
@@ -282,11 +282,11 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         for col in range(1, 18):
             ws_diario.cell(linha, col).border = borda_fina
 
-        formatar_moeda(ws_diario.cell(linha, 16))
+        formatar_moeda(ws_diario.cell(linha, 17))
         linha += 1
 
     ws_diario.freeze_panes = "A4"
-    ws_diario.auto_filter.ref = f"A3:P{max(linha - 1, 3)}"
+    ws_diario.auto_filter.ref = f"A3:Q{max(linha - 1, 3)}"
 
     # =========================
     # Aba 4 - Frequência Mensal (RESTAURADA)

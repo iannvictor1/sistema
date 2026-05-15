@@ -4,6 +4,8 @@ import time
 import socket
 import webbrowser
 import subprocess
+import urllib.error
+import urllib.request
 
 
 # =========================
@@ -53,6 +55,25 @@ def esperar_porta(porta: int, timeout: int = 90) -> bool:
     inicio = time.time()
     while time.time() - inicio < timeout:
         if porta_em_uso(porta):
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def backend_do_sistema_respondendo() -> bool:
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=2) as response:
+            if response.status != 200:
+                return False
+            return b"Sistema rodando" in response.read(300)
+    except (OSError, urllib.error.URLError):
+        return False
+
+
+def esperar_backend_sistema(timeout: int = 90) -> bool:
+    inicio = time.time()
+    while time.time() - inicio < timeout:
+        if backend_do_sistema_respondendo():
             return True
         time.sleep(0.5)
     return False
@@ -110,9 +131,14 @@ def rodar_launcher() -> None:
     # Sobe backend
     if not porta_em_uso(8000):
         backend = subprocess.Popen(get_launcher_command("--backend"), cwd=WORK_DIR)
+    elif not backend_do_sistema_respondendo():
+        raise RuntimeError(
+            "A porta 8000 ja esta em uso, mas nao parece ser o backend deste sistema. "
+            "Feche o processo que esta usando a porta 8000 e abra o sistema novamente."
+        )
 
-    if not esperar_porta(8000, timeout=30):
-        raise RuntimeError("Backend não subiu na porta 8000.")
+    if not esperar_backend_sistema(timeout=30):
+        raise RuntimeError("Backend nao subiu corretamente na porta 8000.")
 
     # Sobe frontend
     if not porta_em_uso(8501):

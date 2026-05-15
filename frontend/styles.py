@@ -272,17 +272,41 @@ label,
 .stCheckbox label,
 .stCheckbox label span,
 [data-testid="stCheckbox"] label,
-[data-testid="stCheckbox"] span {
+[data-testid="stCheckbox"] span,
+[data-testid="stCheckbox"] label p,
+[data-testid="stCheckbox"] [data-testid="stMarkdownContainer"] p {
     color: #FFFFFF !important;
     font-size: 0.95rem !important;
     font-weight: 600 !important;
     font-family: 'Space Grotesk', sans-serif !important;
-    letter-spacing: 0.02em !important;
+    letter-spacing: 0 !important;
     text-transform: none !important;
+    line-height: 1.35 !important;
 }
 
 [data-testid="stCheckbox"] {
     margin-top: 8px !important;
+}
+
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"] {
+    align-items: center !important;
+    gap: 0.55rem !important;
+}
+
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"] > span:first-child {
+    background: rgba(255,255,255,0.08) !important;
+    border: 1px solid rgba(255,255,255,0.45) !important;
+    box-shadow: 0 0 0 1px rgba(47,255,160,0.12) !important;
+}
+
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]:hover > span:first-child {
+    border-color: var(--mint-300) !important;
+    background: rgba(47,255,160,0.10) !important;
+}
+
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"] svg {
+    color: var(--ink-950) !important;
+    fill: var(--ink-950) !important;
 }
 
 /* ===== INPUTS ===== */

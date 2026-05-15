@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
@@ -19,9 +20,17 @@ from .schemas import (
 from .calculos import calcular_bonus, calcular_bonus_mensal
 from .export_excel import exportar_fechamento_excel
 from datetime import date
+from pathlib import Path
 import unicodedata
 
 app = FastAPI(title="Sistema de Bonificação")
+
+PROJECT_DIR = Path(__file__).resolve().parents[1]
+FRONTEND_DIST = PROJECT_DIR / "frontend-react" / "dist"
+FRONTEND_INDEX = FRONTEND_DIST / "index.html"
+
+if (FRONTEND_DIST / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
 Base.metadata.create_all(bind=engine)
 
@@ -95,15 +104,17 @@ def normalizar_texto(valor: str) -> str:
 
 
 def turnos_do_filtro(filtro_turno: str) -> set[str]:
-    if normalizar_texto(filtro_turno) == "manha e tarde":
-        return {"manha", "tarde"}
     return {normalizar_texto(filtro_turno)}
 
 
 def funcionario_aplicavel_tipo(funcionario: Funcionario, tipo_funcionario: str) -> bool:
+    tipo_entrega = normalizar_texto(funcionario.tipo_entrega)
+
     if normalizar_texto(tipo_funcionario) == "funcionario normal":
-        return normalizar_texto(funcionario.tipo_entrega) in {"", "nao se aplica", "n?o se aplica"}
-    return normalizar_texto(funcionario.tipo_entrega) == normalizar_texto(tipo_funcionario)
+        return tipo_entrega in {"", "nao se aplica", "n?o se aplica"}
+    if normalizar_texto(tipo_funcionario) == "entrega":
+        return tipo_entrega in {"entrega", "motorista", "ajudante", "ajudante de motorista"}
+    return tipo_entrega == normalizar_texto(tipo_funcionario)
 
 
 def get_db():
@@ -116,7 +127,22 @@ def get_db():
 
 @app.get("/")
 def home():
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
     return {"status": "Sistema rodando"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "Sistema rodando"}
+
+
+@app.get("/logo.png", include_in_schema=False)
+def frontend_logo():
+    logo_path = FRONTEND_DIST / "logo.png"
+    if logo_path.exists():
+        return FileResponse(logo_path)
+    raise HTTPException(status_code=404, detail="Logo nao encontrado.")
 
 
 @app.post("/funcionarios", response_model=FuncionarioResponse)
@@ -150,6 +176,7 @@ def criar_funcionario(funcionario: FuncionarioCreate, db: Session = Depends(get_
 def listar_funcionarios(db: Session = Depends(get_db)):
     return db.query(Funcionario).order_by(Funcionario.nome).all()
 
+
 @app.put("/funcionarios/{funcionario_id}", response_model=FuncionarioResponse)
 def editar_funcionario(
     funcionario_id: int,
@@ -175,6 +202,41 @@ def editar_funcionario(
     db.refresh(funcionario)
 
     return funcionario
+
+
+@app.delete("/funcionarios/{funcionario_id}")
+def excluir_funcionario(
+    funcionario_id: int,
+    db: Session = Depends(get_db)
+):
+    funcionario = (
+        db.query(Funcionario)
+        .filter(Funcionario.id == funcionario_id)
+        .first()
+    )
+
+    if not funcionario:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
+
+    total_lancamentos = (
+        db.query(LancamentoSemanal)
+        .filter(LancamentoSemanal.funcionario_id == funcionario_id)
+        .delete()
+    )
+    total_frequencias = (
+        db.query(FrequenciaMensal)
+        .filter(FrequenciaMensal.funcionario_id == funcionario_id)
+        .delete()
+    )
+
+    db.delete(funcionario)
+    db.commit()
+
+    return {
+        "mensagem": "Funcionário excluído com sucesso.",
+        "lancamentos_excluidos": total_lancamentos,
+        "frequencias_excluidas": total_frequencias
+    }
 
 
 @app.post("/lancamentos-semanais", response_model=LancamentoSemanalResponse)
@@ -238,6 +300,7 @@ def criar_lancamento_semanal(
 @app.get("/lancamentos-semanais", response_model=list[LancamentoSemanalResponse])
 def listar_lancamentos_semanais(db: Session = Depends(get_db)):
     return db.query(LancamentoSemanal).order_by(LancamentoSemanal.id.desc()).all()
+
 
 @app.put("/lancamentos-semanais/{lancamento_id}", response_model=LancamentoSemanalResponse)
 def editar_lancamento_semanal(
@@ -316,15 +379,8 @@ def criar_lancamento_mensal(
     if not funcionarios_aplicaveis:
         raise HTTPException(status_code=400, detail="Nenhum funcionário aplicável encontrado para os filtros.")
 
-    total_funcionarios = len(funcionarios_aplicaveis)
     semana = f"Mensal - {lancamento.mes[5:7]}/{lancamento.mes[:4]}"
     data_lancamento = date.fromisoformat(f"{lancamento.mes}-01")
-
-    pedidos_separados = lancamento.pedidos_separados / total_funcionarios
-    pedidos_carregados = lancamento.pedidos_carregados / total_funcionarios
-    toneladas = lancamento.toneladas / total_funcionarios
-    entregas = lancamento.entregas / total_funcionarios
-    retornos = lancamento.retornos / total_funcionarios
 
     criados = []
 
@@ -335,11 +391,11 @@ def criar_lancamento_mensal(
 
         bonus = calcular_bonus(
             tipo_entrega=funcionario.tipo_entrega,
-            pedidos_separados=pedidos_separados,
-            pedidos_carregados=pedidos_carregados,
-            toneladas=toneladas,
-            entregas=entregas,
-            retornos=retornos,
+            pedidos_separados=lancamento.pedidos_separados,
+            pedidos_carregados=lancamento.pedidos_carregados,
+            toneladas=lancamento.toneladas,
+            entregas=lancamento.entregas,
+            retornos=lancamento.retornos,
             nota=nota,
             penalidade=False,
             turno=funcionario.turno
@@ -352,11 +408,11 @@ def criar_lancamento_mensal(
             data_lancamento=data_lancamento,
             data_registro=date.today(),
             usuario_lancamento=lancamento.usuario_lancamento,
-            pedidos_separados=round(pedidos_separados),
-            pedidos_carregados=round(pedidos_carregados),
-            toneladas=round(toneladas, 3),
-            entregas=round(entregas),
-            retornos=round(retornos),
+            pedidos_separados=lancamento.pedidos_separados,
+            pedidos_carregados=lancamento.pedidos_carregados,
+            toneladas=lancamento.toneladas,
+            entregas=lancamento.entregas,
+            retornos=lancamento.retornos,
             nota=nota,
             penalidade=False,
             motivo_penalidade=None,
@@ -457,6 +513,77 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
 @app.get("/frequencias", response_model=list[FrequenciaMensalResponse])
 def listar_frequencias(db: Session = Depends(get_db)):
     return db.query(FrequenciaMensal).order_by(FrequenciaMensal.id.desc()).all()
+
+
+@app.put("/frequencias/{frequencia_id}", response_model=FrequenciaMensalResponse)
+def editar_frequencia(
+    frequencia_id: int,
+    dados: FrequenciaMensalCreate,
+    db: Session = Depends(get_db)
+):
+    frequencia = (
+        db.query(FrequenciaMensal)
+        .filter(FrequenciaMensal.id == frequencia_id)
+        .first()
+    )
+
+    if not frequencia:
+        raise HTTPException(status_code=404, detail="Frequência não encontrada.")
+
+    funcionario = (
+        db.query(Funcionario)
+        .filter(Funcionario.id == dados.funcionario_id)
+        .first()
+    )
+
+    if not funcionario:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
+
+    tipos_falta_validos = {"Falta", "Atestado", "Licença legal"}
+
+    if dados.status_mes == "Férias":
+        dados.ausencias = 0
+        dados.data_falta = None
+        dados.tipo_falta = None
+    elif dados.ausencias > 0:
+        if not dados.data_falta:
+            raise HTTPException(status_code=400, detail="Informe o dia da falta.")
+        if dados.tipo_falta not in tipos_falta_validos:
+            raise HTTPException(status_code=400, detail="Informe um tipo de falta válido.")
+        dados.mes = dados.data_falta.strftime("%Y-%m")
+    else:
+        dados.data_falta = None
+        dados.tipo_falta = None
+
+    frequencia.funcionario_id = dados.funcionario_id
+    frequencia.mes = dados.mes
+    frequencia.ausencias = dados.ausencias
+    frequencia.data_falta = dados.data_falta
+    frequencia.tipo_falta = dados.tipo_falta
+    frequencia.status_mes = dados.status_mes
+
+    db.commit()
+    db.refresh(frequencia)
+    return frequencia
+
+
+@app.delete("/frequencias/{frequencia_id}")
+def excluir_frequencia(
+    frequencia_id: int,
+    db: Session = Depends(get_db)
+):
+    frequencia = (
+        db.query(FrequenciaMensal)
+        .filter(FrequenciaMensal.id == frequencia_id)
+        .first()
+    )
+
+    if not frequencia:
+        raise HTTPException(status_code=404, detail="Frequência não encontrada.")
+
+    db.delete(frequencia)
+    db.commit()
+    return {"mensagem": "Frequência excluída com sucesso."}
 
 
 @app.get("/fechamento/{mes}")
@@ -596,3 +723,10 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{nome_arquivo}"'}
     )
+
+
+@app.get("/{full_path:path}", include_in_schema=False)
+def frontend_app(full_path: str):
+    if FRONTEND_INDEX.exists():
+        return FileResponse(FRONTEND_INDEX)
+    raise HTTPException(status_code=404, detail="Frontend nao compilado.")

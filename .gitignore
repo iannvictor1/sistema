@@ -6,14 +6,22 @@ __pycache__/
 
 # Ambiente virtual
 .venv/
+.venv*/
 
 # Banco de dados
 *.db
+*.sqlite
+*.sqlite3
 
 # Build / EXE
 build/
 dist/
+frontend-react/dist/
 *.spec
+
+# Frontend
+node_modules/
+frontend-react/node_modules/
 
 # Logs
 *.log
@@ -24,3 +32,9 @@ dist/
 
 # Outros
 *.zip
+*.rar
+backup
+backups/
+.env
+.env.*
+!.env.example

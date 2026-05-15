@@ -21,4 +21,4 @@ def gerar_semana_mes(data_ref: date) -> str:
 
 
 def funcionario_recebe_entrega(tipo_entrega: str) -> bool:
-    return tipo_entrega in ["Motorista", "Ajudante de motorista"]
+    return tipo_entrega in ["Entrega", "Motorista", "Ajudante de motorista"]

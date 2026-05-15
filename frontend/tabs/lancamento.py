@@ -1,12 +1,20 @@
 import requests
 import streamlit as st
-from utils import gerar_semana_mes, funcionario_recebe_entrega, API_URL
+from utils import gerar_semana_mes, API_URL
 
 
 def _turnos_do_filtro(filtro_turno: str) -> set[str]:
-    if filtro_turno == "Manhã e Tarde":
-        return {"Manhã", "Tarde"}
     return {filtro_turno}
+
+
+def _tipo_entrega_eh_entrega(tipo_entrega: str) -> bool:
+    return tipo_entrega in ["Entrega", "Motorista", "Ajudante de motorista"]
+
+
+def _rotulo_tipo_entrega(tipo_entrega: str) -> str:
+    if _tipo_entrega_eh_entrega(tipo_entrega):
+        return "Entrega"
+    return tipo_entrega or "Não se aplica"
 
 
 def _funcionario_aplicavel(funcionario: dict, filtro_turno: str, tipo_funcionario: str) -> bool:
@@ -17,6 +25,8 @@ def _funcionario_aplicavel(funcionario: dict, filtro_turno: str, tipo_funcionari
 
     if tipo_funcionario == "Funcionário normal":
         return tipo_entrega == "Não se aplica"
+    if tipo_funcionario == "Entrega":
+        return _tipo_entrega_eh_entrega(tipo_entrega)
 
     return tipo_entrega == tipo_funcionario
 
@@ -33,14 +43,14 @@ def _render_lancamento_mensal(API_URL: str, funcionarios: list[dict]):
     with col_turno:
         filtro_turno = st.selectbox(
             "Turno",
-            ["Manhã", "Tarde", "Noite", "Manhã e Tarde"],
+            ["Manhã", "Tarde", "Noite"],
             key="lanc_mensal_turno"
         )
 
     with col_tipo:
         tipo_funcionario = st.selectbox(
             "Tipo de funcionário",
-            ["Funcionário normal", "Motorista", "Ajudante de motorista"],
+            ["Funcionário normal", "Entrega"],
             key="lanc_mensal_tipo_funcionario"
         )
 
@@ -62,51 +72,28 @@ def _render_lancamento_mensal(API_URL: str, funcionarios: list[dict]):
     entregas = 0
     retornos = 0
 
-    if tipo_funcionario == "Funcionário normal":
-        if filtro_turno == "Noite":
-            pedidos_car = st.number_input(
-                "Total de pedidos carregados no mês",
-                min_value=0,
-                value=0,
-                key="lanc_mensal_pedidos_car"
-            )
-        else:
-            col1, col2 = st.columns(2)
-
-            with col1:
-                pedidos_sep = st.number_input(
-                    "Total de pedidos separados no mês",
-                    min_value=0,
-                    value=0,
-                    key="lanc_mensal_pedidos_sep"
-                )
-
-            with col2:
-                toneladas = st.number_input(
-                    "Total de toneladas recebidas no mês",
-                    min_value=0.0,
-                    value=0.0,
-                    step=0.1,
-                    key="lanc_mensal_toneladas"
-                )
-    else:
-        col1, col2 = st.columns(2)
-
-        with col1:
-            entregas = st.number_input(
-                "Total de entregas no mês",
-                min_value=0,
-                value=0,
-                key="lanc_mensal_entregas"
-            )
-
-        with col2:
-            retornos = st.number_input(
-                "Total de retornos no mês",
-                min_value=0,
-                value=0,
-                key="lanc_mensal_retornos"
-            )
+    if filtro_turno == "Manhã":
+        toneladas = st.number_input(
+            "Total de toneladas recebidas no mês",
+            min_value=0.0,
+            value=0.0,
+            step=0.1,
+            key="lanc_mensal_toneladas"
+        )
+    elif filtro_turno == "Tarde":
+        pedidos_sep = st.number_input(
+            "Total de pedidos separados no mês",
+            min_value=0,
+            value=0,
+            key="lanc_mensal_pedidos_sep"
+        )
+    elif filtro_turno == "Noite":
+        pedidos_car = st.number_input(
+            "Total de pedidos carregados no mês",
+            min_value=0,
+            value=0,
+            key="lanc_mensal_pedidos_car"
+        )
 
     st.markdown("### Notas individuais")
     notas = {}
@@ -142,11 +129,24 @@ def _render_lancamento_mensal(API_URL: str, funcionarios: list[dict]):
 
             if response.status_code == 200:
                 dados = response.json()
-                total_bonus = sum(float(item.get("bonus_calculado", 0)) for item in dados)
-                st.success(
-                    f"Lançamento mensal salvo para {len(dados)} funcionário(s). "
-                    f"Total calculado: R$ {total_bonus:.2f}"
-                )
+                valores_bonus = {
+                    float(item.get("bonus_calculado", 0))
+                    for item in dados
+                }
+                if len(valores_bonus) == 1:
+                    bonus_por_funcionario = valores_bonus.pop()
+                    st.success(
+                        f"Lançamento mensal salvo para {len(dados)} funcionário(s). "
+                        f"Valor por funcionário: R$ {bonus_por_funcionario:.2f}"
+                    )
+                else:
+                    valores_formatados = ", ".join(
+                        f"R$ {valor:.2f}" for valor in sorted(valores_bonus, reverse=True)
+                    )
+                    st.success(
+                        f"Lançamento mensal salvo para {len(dados)} funcionário(s). "
+                        f"Valores por funcionário: {valores_formatados}"
+                    )
             else:
                 st.error(f"Erro ao salvar lançamento mensal: {response.text}")
         except requests.exceptions.ConnectionError:
@@ -193,7 +193,7 @@ def render_lancamento(API_URL: str):
             return
 
         mapa_funcionarios = {
-            f"{f['nome']} - {f['cargo']} - {f.get('turno', 'Não informado')} - {f.get('tipo_entrega', 'Não se aplica')} (ID {f['id']})": f
+            f"{f['nome']} - {f['cargo']} - {f.get('turno', 'Não informado')} - {_rotulo_tipo_entrega(f.get('tipo_entrega', 'Não se aplica'))} (ID {f['id']})": f
             for f in funcionarios
         }
 
@@ -205,124 +205,108 @@ def render_lancamento(API_URL: str):
 
         funcionario_selecionado = mapa_funcionarios[funcionario_label]
         funcionario_id = funcionario_selecionado["id"]
-        tipo_entrega_funcionario = funcionario_selecionado.get("tipo_entrega", "Não se aplica")
+        tipo_entrega_funcionario = _rotulo_tipo_entrega(funcionario_selecionado.get("tipo_entrega", "Não se aplica"))
         turno_funcionario = funcionario_selecionado.get("turno", "Não informado")
-        recebe_entrega = funcionario_recebe_entrega(tipo_entrega_funcionario)
 
         st.info(f"Turno: {turno_funcionario} | Função de entrega: {tipo_entrega_funcionario}")
 
-        if recebe_entrega:
-            pedidos_sep = 0
-            pedidos_car = 0
-            toneladas = 0.0
+        entregas = 0
+        retornos = 0
 
-            col1, col2, col3 = st.columns(3)
-            
+        pedidos_sep = 0
+        pedidos_car = 0
+        toneladas = 0.0
+
+        if turno_funcionario == "Manhã":
+            col1, col2 = st.columns(2)
+
             with col1:
-                entregas = st.number_input(
-                    "Entregas",
-                    min_value=0,
-                    value=0,
-                    key="lanc_entregas"
+                toneladas = st.number_input(
+                    "Toneladas recebidas",
+                    min_value=0.0,
+                    value=0.0,
+                    step=0.1,
+                    key="lanc_toneladas"
                 )
-                
+
             with col2:
-                retornos = st.number_input(
-                    "Retornos",
+                nota = st.selectbox(
+                    "Nota",
+                    [1, 2, 3, 4, 5],
+                    index=2,
+                    key="lanc_nota"
+                )
+        elif turno_funcionario == "Tarde":
+            col1, col2 = st.columns(2)
+
+            with col1:
+                pedidos_sep = st.number_input(
+                    "Pedidos separados",
                     min_value=0,
                     value=0,
-                    key="lanc_retornos"
+                    key="lanc_pedidos_sep"
                 )
-                
-            nota = 5
+
+            with col2:
+                nota = st.selectbox(
+                    "Nota",
+                    [1, 2, 3, 4, 5],
+                    index=2,
+                    key="lanc_nota"
+                )
+        elif turno_funcionario == "Noite":
+            col1, col2 = st.columns(2)
+
+            with col1:
+                pedidos_car = st.number_input(
+                    "Pedidos carregados",
+                    min_value=0,
+                    value=0,
+                    key="lanc_pedidos_car"
+                )
+
+            with col2:
+                nota = st.selectbox(
+                    "Nota",
+                    [1, 2, 3, 4, 5],
+                    index=2,
+                    key="lanc_nota"
+                )
         else:
-            entregas = 0
-            retornos = 0
+            col1, col2, col3, col4 = st.columns(4)
 
-            pedidos_sep = 0
-            pedidos_car = 0
-            toneladas = 0.0
+            with col1:
+                toneladas = st.number_input(
+                    "Toneladas",
+                    min_value=0.0,
+                    value=0.0,
+                    step=0.1,
+                    key="lanc_toneladas"
+                )
 
-            if turno_funcionario in ["Manhã", "Tarde"]:
-                col1, col2, col3 = st.columns(3)
+            with col2:
+                pedidos_sep = st.number_input(
+                    "Pedidos separados",
+                    min_value=0,
+                    value=0,
+                    key="lanc_pedidos_sep"
+                )
 
-                with col1:
-                    pedidos_sep = st.number_input(
-                        "Pedidos separados",
-                        min_value=0,
-                        value=0,
-                        key="lanc_pedidos_sep"
-                    )
+            with col3:
+                pedidos_car = st.number_input(
+                    "Pedidos carregados",
+                    min_value=0,
+                    value=0,
+                    key="lanc_pedidos_car"
+                )
 
-                with col2:
-                    toneladas = st.number_input(
-                        "Toneladas recebidas",
-                        min_value=0.0,
-                        value=0.0,
-                        step=0.1,
-                        key="lanc_toneladas"
-                    )
-
-                with col3:
-                    nota = st.selectbox(
-                        "Nota",
-                        [1, 2, 3, 4, 5],
-                        index=2,
-                        key="lanc_nota"
-                    )
-            elif turno_funcionario == "Noite":
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    pedidos_car = st.number_input(
-                        "Pedidos carregados",
-                        min_value=0,
-                        value=0,
-                        key="lanc_pedidos_car"
-                    )
-
-                with col2:
-                    nota = st.selectbox(
-                        "Nota",
-                        [1, 2, 3, 4, 5],
-                        index=2,
-                        key="lanc_nota"
-                    )
-            else:
-                col1, col2, col3, col4 = st.columns(4)
-
-                with col1:
-                    pedidos_sep = st.number_input(
-                        "Pedidos separados",
-                        min_value=0,
-                        value=0,
-                        key="lanc_pedidos_sep"
-                    )
-
-                with col2:
-                    pedidos_car = st.number_input(
-                        "Pedidos carregados",
-                        min_value=0,
-                        value=0,
-                        key="lanc_pedidos_car"
-                    )
-
-                with col3:
-                    toneladas = st.number_input(
-                        "Toneladas",
-                        min_value=0.0,
-                        value=0.0,
-                        step=0.1,
-                        key="lanc_toneladas"
-                    )
-
-                with col4:
-                    nota = st.selectbox(
-                        "Nota",
-                        [1, 2, 3, 4, 5],
-                        index=2,
-                        key="lanc_nota"
-                    )
+            with col4:
+                nota = st.selectbox(
+                    "Nota",
+                    [1, 2, 3, 4, 5],
+                    index=2,
+                    key="lanc_nota"
+                )
                 
         
         

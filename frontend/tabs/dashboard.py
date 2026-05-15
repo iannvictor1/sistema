@@ -40,7 +40,13 @@ def render_dashboard(API_URL: str):
         ]
 
         if erros:
-            st.error("Erro ao carregar dados do dashboard.")
+            if all(resp.status_code == 404 for resp in respostas.values()):
+                st.error(
+                    "O dashboard encontrou outro servico ou uma versao antiga do backend na porta 8000. "
+                    "Feche o sistema, encerre processos antigos se houver, e abra novamente."
+                )
+            else:
+                st.error("Erro ao carregar dados do dashboard.")
             with st.expander("Detalhes técnicos"):
                 st.code("\n".join(erros))
             return

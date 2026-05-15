@@ -11,7 +11,7 @@ def render_cadastro(API_URL: str):
 
         tipo_entrega = st.selectbox(
             "Função de entrega",
-            ["Não se aplica", "Motorista", "Ajudante de motorista"],
+            ["Não se aplica", "Entrega"],
             key="cad_tipo_entrega"
         )
 

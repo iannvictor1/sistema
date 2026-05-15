@@ -5,6 +5,12 @@ from utils import API_URL
 from utils import gerar_semana_mes
 
 
+def _rotulo_tipo_entrega(tipo_entrega: str) -> str:
+    if tipo_entrega in ["Motorista", "Ajudante de motorista"]:
+        return "Entrega"
+    return tipo_entrega or "Não se aplica"
+
+
 def render_historico_lancamentos(API_URL: str):
     st.subheader("Lançamentos")
 
@@ -44,6 +50,48 @@ def render_historico_lancamentos(API_URL: str):
 
             mapa_funcionarios = {f["id"]: f for f in funcionarios}
 
+            col_nome, col_tipo, col_turno = st.columns(3)
+
+            with col_nome:
+                filtro_nome = st.text_input(
+                    "Filtrar por funcionário",
+                    key="filtro_nome_lancamentos"
+                )
+
+            with col_tipo:
+                filtro_tipo = st.selectbox(
+                    "Tipo de lançamento",
+                    ["Todos", "Mensal", "Semanal", "Diário"],
+                    key="filtro_tipo_lancamentos"
+                )
+
+            with col_turno:
+                filtro_turno = st.selectbox(
+                    "Turno",
+                    ["Todos", "Manhã", "Tarde", "Noite"],
+                    key="filtro_turno_lancamentos"
+                )
+
+            col_valor_min, col_valor_max = st.columns(2)
+
+            with col_valor_min:
+                filtro_valor_min = st.number_input(
+                    "Valor mínimo",
+                    min_value=0.0,
+                    value=0.0,
+                    step=10.0,
+                    key="filtro_valor_min_lancamentos"
+                )
+
+            with col_valor_max:
+                filtro_valor_max = st.number_input(
+                    "Valor máximo",
+                    min_value=0.0,
+                    value=0.0,
+                    step=10.0,
+                    key="filtro_valor_max_lancamentos"
+                )
+
             lancamentos_filtrados = []
 
             for l in lancamentos:
@@ -59,18 +107,97 @@ def render_historico_lancamentos(API_URL: str):
                         data_lancamento == filtro_data.strftime("%Y-%m-%d")
                     )
 
-                if corresponde_mes and corresponde_dia:
+                funcionario = mapa_funcionarios.get(l["funcionario_id"], {})
+                nome_funcionario = funcionario.get("nome", "")
+                turno_funcionario = funcionario.get("turno", "")
+                tipo_lancamento = l.get("tipo_lancamento", "semanal")
+                valor_bonus = float(l.get("bonus_calculado", 0))
+
+                corresponde_nome = (
+                    not filtro_nome.strip()
+                    or filtro_nome.strip().lower() in nome_funcionario.lower()
+                )
+                corresponde_tipo = (
+                    filtro_tipo == "Todos"
+                    or tipo_lancamento == filtro_tipo.lower().replace("á", "a")
+                )
+                corresponde_turno = (
+                    filtro_turno == "Todos"
+                    or turno_funcionario == filtro_turno
+                )
+                corresponde_valor = (
+                    valor_bonus >= filtro_valor_min
+                    and (filtro_valor_max == 0 or valor_bonus <= filtro_valor_max)
+                )
+
+                if (
+                    corresponde_mes
+                    and corresponde_dia
+                    and corresponde_nome
+                    and corresponde_tipo
+                    and corresponde_turno
+                    and corresponde_valor
+                ):
                     lancamentos_filtrados.append(l)
 
             if not lancamentos_filtrados:
                 st.info(f"Nenhum lançamento encontrado para {mes_ano}.")
                 return
 
+            opcoes_exclusao = {}
+            for l in lancamentos_filtrados:
+                funcionario = mapa_funcionarios.get(l["funcionario_id"], {})
+                nome_funcionario = funcionario.get("nome", f"Funcionário #{l['funcionario_id']}")
+                opcoes_exclusao[
+                    f"#{l['id']} - {nome_funcionario} - R$ {float(l.get('bonus_calculado', 0)):.2f}"
+                ] = l["id"]
+
+            selecionados_exclusao = st.multiselect(
+                "Selecionar lançamentos para excluir",
+                list(opcoes_exclusao.keys()),
+                key="lancamentos_para_excluir"
+            )
+
+            col_confirmar, col_excluir = st.columns([2, 1])
+
+            with col_confirmar:
+                confirmar_exclusao = st.checkbox(
+                    "Confirmar exclusão dos selecionados",
+                    key="confirmar_excluir_lancamentos_selecionados"
+                )
+
+            with col_excluir:
+                st.write("")
+                if st.button("Excluir selecionados", key="btn_excluir_lancamentos_selecionados"):
+                    if not selecionados_exclusao:
+                        st.warning("Selecione pelo menos um lançamento.")
+                    elif not confirmar_exclusao:
+                        st.warning("Marque a confirmação antes de excluir.")
+                    else:
+                        erros = []
+
+                        for label in selecionados_exclusao:
+                            lancamento_id = opcoes_exclusao[label]
+                            resp_del = requests.delete(
+                                f"{API_URL}/lancamentos-semanais/{lancamento_id}",
+                                timeout=10
+                            )
+
+                            if resp_del.status_code != 200:
+                                erros.append(label)
+
+                        if erros:
+                            st.error(f"Erro ao excluir: {', '.join(erros)}")
+                        else:
+                            st.success(f"{len(selecionados_exclusao)} lançamento(s) excluído(s) com sucesso.")
+                            st.rerun()
+
             for l in lancamentos_filtrados:
                 funcionario = mapa_funcionarios.get(l["funcionario_id"], {})
                 nome_funcionario = funcionario.get("nome", f"Funcionário #{l['funcionario_id']}")
                 cargo_funcionario = funcionario.get("cargo", "-")
-                tipo_entrega = funcionario.get("tipo_entrega", "Não se aplica")
+                tipo_entrega = _rotulo_tipo_entrega(funcionario.get("tipo_entrega", "Não se aplica"))
+                turno_funcionario = funcionario.get("turno", "Não informado")
 
                 tipo_lancamento = l.get("tipo_lancamento", "semanal")
                 data_escolhida = l.get("data_lancamento") or "—"
@@ -87,7 +214,7 @@ def render_historico_lancamentos(API_URL: str):
                 <div class="card-item">
                     <strong>#{l['id']}</strong> &nbsp;·&nbsp;
                     <strong>{nome_funcionario}</strong>
-                    <span style="color:#9A9690"> · {cargo_funcionario} · {tipo_entrega}</span>
+                    <span style="color:#9A9690"> · {cargo_funcionario} · {turno_funcionario} · {tipo_entrega}</span>
                     <br>
                     Tipo: <strong>{tipo_lancamento}</strong>
                     &nbsp;·&nbsp; Semana <strong>{l['semana']}</strong>
@@ -121,40 +248,33 @@ def render_historico_lancamentos(API_URL: str):
                             key=f"edit_semana_{l['id']}"
                         )
 
-                    recebe_entrega = tipo_entrega in ["Motorista", "Ajudante de motorista"]
+                    novas_entregas = 0
+                    novos_retornos = 0
+                    novos_pedidos_sep = 0
+                    novos_pedidos_car = 0
+                    novas_toneladas = 0.0
 
-                    if recebe_entrega:
-
-                        novos_pedidos_sep = 0
-                        novos_pedidos_car = 0
-                        novas_toneladas = 0.0
-
+                    if turno_funcionario == "Manhã":
                         col1, col2 = st.columns(2)
 
                         with col1:
-                            novas_entregas = st.number_input(
-                                "Entregas",
-                                min_value=0,
-                                value=int(l["entregas"]),
-                                key=f"edit_entregas_{l['id']}"
+                            novas_toneladas = st.number_input(
+                                "Toneladas",
+                                min_value=0.0,
+                                value=float(l["toneladas"]),
+                                step=0.1,
+                                key=f"edit_ton_{l['id']}"
                             )
 
                         with col2:
-                            novos_retornos = st.number_input(
-                                "Retornos",
-                                min_value=0,
-                                value=int(l["retornos"]),
-                                key=f"edit_retornos_{l['id']}"
+                            nova_nota = st.selectbox(
+                                "Nota",
+                                [1, 2, 3, 4, 5],
+                                index=[1, 2, 3, 4, 5].index(int(l["nota"])),
+                                key=f"edit_nota_{l['id']}"
                             )
-
-                        nova_nota = 5
-
-                    else:
-
-                        novas_entregas = 0
-                        novos_retornos = 0
-
-                        col1, col2, col3, col4 = st.columns(4)
+                    elif turno_funcionario == "Tarde":
+                        col1, col2 = st.columns(2)
 
                         with col1:
                             novos_pedidos_sep = st.number_input(
@@ -165,6 +285,16 @@ def render_historico_lancamentos(API_URL: str):
                             )
 
                         with col2:
+                            nova_nota = st.selectbox(
+                                "Nota",
+                                [1, 2, 3, 4, 5],
+                                index=[1, 2, 3, 4, 5].index(int(l["nota"])),
+                                key=f"edit_nota_{l['id']}"
+                            )
+                    elif turno_funcionario == "Noite":
+                        col1, col2 = st.columns(2)
+
+                        with col1:
                             novos_pedidos_car = st.number_input(
                                 "Pedidos carregados",
                                 min_value=0,
@@ -172,7 +302,17 @@ def render_historico_lancamentos(API_URL: str):
                                 key=f"edit_car_{l['id']}"
                             )
 
-                        with col3:
+                        with col2:
+                            nova_nota = st.selectbox(
+                                "Nota",
+                                [1, 2, 3, 4, 5],
+                                index=[1, 2, 3, 4, 5].index(int(l["nota"])),
+                                key=f"edit_nota_{l['id']}"
+                            )
+                    else:
+                        col1, col2, col3, col4 = st.columns(4)
+
+                        with col1:
                             novas_toneladas = st.number_input(
                                 "Toneladas",
                                 min_value=0.0,
@@ -181,13 +321,29 @@ def render_historico_lancamentos(API_URL: str):
                                 key=f"edit_ton_{l['id']}"
                             )
 
+                        with col2:
+                            novos_pedidos_sep = st.number_input(
+                                "Pedidos separados",
+                                min_value=0,
+                                value=int(l["pedidos_separados"]),
+                                key=f"edit_sep_{l['id']}"
+                            )
+
+                        with col3:
+                            novos_pedidos_car = st.number_input(
+                                "Pedidos carregados",
+                                min_value=0,
+                                value=int(l["pedidos_carregados"]),
+                                key=f"edit_car_{l['id']}"
+                            )
+
                         with col4:
                             nova_nota = st.selectbox(
                                 "Nota",
                                 [1, 2, 3, 4, 5],
                                 index=[1, 2, 3, 4, 5].index(int(l["nota"])),
                                 key=f"edit_nota_{l['id']}"
-                        )
+                            )
                     nova_penalidade = st.checkbox(
                         "Houve penalidade de 50%",
                         value=bool(l["penalidade"]),

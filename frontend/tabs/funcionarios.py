@@ -2,11 +2,27 @@ import requests
 import streamlit as st
 
 
+def _rotulo_tipo_entrega(tipo_entrega: str) -> str:
+    if tipo_entrega in ["Motorista", "Ajudante de motorista"]:
+        return "Entrega"
+    return tipo_entrega or "Não se aplica"
+
+
 def render_funcionarios(API_URL: str):
     st.subheader("Funcionários Cadastrados")
 
-    if st.button("Atualizar lista", key="btn_atualizar_funcionarios"):
-        st.rerun()
+    col_busca, col_atualizar = st.columns([3, 1])
+
+    with col_busca:
+        busca_funcionario = st.text_input(
+            "Pesquisar funcionário",
+            key="busca_funcionarios"
+        )
+
+    with col_atualizar:
+        st.write("")
+        if st.button("Atualizar lista", key="btn_atualizar_funcionarios"):
+            st.rerun()
 
     try:
         response = requests.get(f"{API_URL}/funcionarios", timeout=10)
@@ -16,10 +32,65 @@ def render_funcionarios(API_URL: str):
             return
 
         funcionarios = response.json()
+        termo_busca = busca_funcionario.strip().lower()
+
+        if termo_busca:
+            funcionarios = [
+                f for f in funcionarios
+                if termo_busca in f.get("nome", "").lower()
+                or termo_busca in f.get("cargo", "").lower()
+                or termo_busca in f.get("turno", "").lower()
+                or termo_busca in f.get("tipo_entrega", "").lower()
+            ]
 
         if not funcionarios:
-            st.info("Nenhum funcionário cadastrado ainda.")
+            st.info("Nenhum funcionário encontrado.")
             return
+
+        opcoes_exclusao = {
+            f"{f['nome']} - {f['cargo']} - {f.get('turno', 'Não informado')} (ID {f['id']})": f["id"]
+            for f in funcionarios
+        }
+
+        selecionados_exclusao = st.multiselect(
+            "Selecionar funcionários para excluir",
+            list(opcoes_exclusao.keys()),
+            key="funcionarios_para_excluir"
+        )
+
+        col_confirmar, col_excluir = st.columns([2, 1])
+
+        with col_confirmar:
+            confirmar_exclusao = st.checkbox(
+                "Confirmar exclusão dos selecionados",
+                key="confirmar_excluir_funcionarios_selecionados"
+            )
+
+        with col_excluir:
+            st.write("")
+            if st.button("Excluir selecionados", key="btn_excluir_funcionarios_selecionados"):
+                if not selecionados_exclusao:
+                    st.warning("Selecione pelo menos um funcionário.")
+                elif not confirmar_exclusao:
+                    st.warning("Marque a confirmação antes de excluir.")
+                else:
+                    erros = []
+
+                    for label in selecionados_exclusao:
+                        funcionario_id = opcoes_exclusao[label]
+                        resp_del = requests.delete(
+                            f"{API_URL}/funcionarios/{funcionario_id}",
+                            timeout=10
+                        )
+
+                        if resp_del.status_code != 200:
+                            erros.append(label)
+
+                    if erros:
+                        st.error(f"Erro ao excluir: {', '.join(erros)}")
+                    else:
+                        st.success(f"{len(selecionados_exclusao)} funcionário(s) excluído(s) com sucesso.")
+                        st.rerun()
 
         for f in funcionarios:
             badge = (
@@ -28,7 +99,7 @@ def render_funcionarios(API_URL: str):
                 else '<span class="badge-nao">Inativo</span>'
             )
 
-            entrega = f.get("tipo_entrega", "Não se aplica")
+            entrega = _rotulo_tipo_entrega(f.get("tipo_entrega", "Não se aplica"))
             turno = f.get("turno", "Não informado")
 
             st.markdown(f"""
@@ -44,7 +115,7 @@ def render_funcionarios(API_URL: str):
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander(f"✏️ Editar funcionário #{f['id']} - {f['nome']}"):
+            with st.expander(f"Editar funcionário #{f['id']} - {f['nome']}"):
                 novo_nome = st.text_input(
                     "Nome",
                     value=f["nome"],
@@ -59,11 +130,10 @@ def render_funcionarios(API_URL: str):
 
                 opcoes_entrega = [
                     "Não se aplica",
-                    "Motorista",
-                    "Ajudante de motorista"
+                    "Entrega"
                 ]
 
-                tipo_atual = f.get("tipo_entrega", "Não se aplica")
+                tipo_atual = _rotulo_tipo_entrega(f.get("tipo_entrega", "Não se aplica"))
                 index_tipo = opcoes_entrega.index(tipo_atual) if tipo_atual in opcoes_entrega else 0
 
                 novo_tipo_entrega = st.selectbox(

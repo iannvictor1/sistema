@@ -12,13 +12,17 @@ from tabs.fechamento import render_fechamento
 from tabs.regras_negocio import render_regras
 from tabs.login import tela_login
 import hmac
+from pathlib import Path
 from tabs.dashboard import render_dashboard
 from PIL import Image
 import base64
 from io import BytesIO
 
+LOGO_PATH = Path(__file__).resolve().parent / "assets" / "logo.png"
+
 st.set_page_config(
     page_title="Sistema de Bonificação",
+    page_icon=Image.open(LOGO_PATH),
     layout="wide",
     initial_sidebar_state="collapsed"
 )
