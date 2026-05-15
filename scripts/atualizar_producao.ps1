@@ -30,17 +30,38 @@ function Restart-OptionalScheduledTask($Name) {
     Write-Step "Reiniciando tarefa agendada: $Name"
     $taskName = if ($Name.StartsWith("\")) { $Name } else { "\$Name" }
 
-    schtasks.exe /Query /TN $taskName | Out-Null
+    $queryOutput = schtasks.exe /Query /TN $taskName 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Tarefa agendada '$taskName' nao encontrada. Crie a tarefa com scripts\criar_tarefa_backend_producao.ps1."
+        $message = ($queryOutput | Out-String).Trim()
+        if ($message -match "Acesso negado|Access is denied") {
+            throw "Acesso negado ao consultar a tarefa '$taskName'. Abra o PowerShell como Administrador e rode o update novamente."
+        }
+
+        throw "Tarefa agendada '$taskName' nao encontrada. Crie a tarefa com scripts\criar_tarefa_backend_producao.ps1. Detalhe: $message"
     }
 
-    schtasks.exe /End /TN $taskName | Out-Null
+    $endOutput = schtasks.exe /End /TN $taskName 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $message = ($endOutput | Out-String).Trim()
+        if ($message -notmatch "nao esta em execucao|not currently running") {
+            if ($message -match "Acesso negado|Access is denied") {
+                throw "Acesso negado ao parar a tarefa '$taskName'. Abra o PowerShell como Administrador e rode o update novamente."
+            }
+
+            throw "Nao foi possivel parar a tarefa agendada '$taskName'. Detalhe: $message"
+        }
+    }
+
     Start-Sleep -Seconds 2
 
-    schtasks.exe /Run /TN $taskName | Out-Null
+    $runOutput = schtasks.exe /Run /TN $taskName 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Nao foi possivel iniciar a tarefa agendada '$taskName'."
+        $message = ($runOutput | Out-String).Trim()
+        if ($message -match "Acesso negado|Access is denied") {
+            throw "Acesso negado ao iniciar a tarefa '$taskName'. Abra o PowerShell como Administrador e rode o update novamente."
+        }
+
+        throw "Nao foi possivel iniciar a tarefa agendada '$taskName'. Detalhe: $message"
     }
 }
 
