@@ -172,10 +172,7 @@ export function App() {
         <header className="topbar">
           <div>
             <p>Sistema de bônus</p>
-            <h1>
-              {tabs.find((tab) => tab.id === activeTab)?.label}
-              {activeTab === "dashboard" ? " atualizado" : ""}
-            </h1>
+            <h1>{tabs.find((tab) => tab.id === activeTab)?.label}</h1>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" onClick={data.load} title="Atualizar dados" type="button">
