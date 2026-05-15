@@ -28,28 +28,20 @@ function Restart-OptionalScheduledTask($Name) {
     }
 
     Write-Step "Reiniciando tarefa agendada: $Name"
-    $task = Get-ScheduledTask | Where-Object { $_.TaskName -eq $Name } | Select-Object -First 1
+    $taskName = if ($Name.StartsWith("\")) { $Name } else { "\$Name" }
 
-    if (!$task) {
-        $knownTasks = Get-ScheduledTask |
-            Where-Object { $_.TaskName -like "*Bonificacao*" -or $_.TaskName -like "*Bonificação*" } |
-            Select-Object -ExpandProperty TaskName
-
-        $hint = if ($knownTasks) {
-            " Tarefas parecidas encontradas: $($knownTasks -join ', ')."
-        } else {
-            " Nenhuma tarefa parecida foi encontrada. Crie a tarefa com scripts\criar_tarefa_backend_producao.ps1."
-        }
-
-        throw "Tarefa agendada '$Name' nao encontrada.$hint"
+    schtasks.exe /Query /TN $taskName | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Tarefa agendada '$taskName' nao encontrada. Crie a tarefa com scripts\criar_tarefa_backend_producao.ps1."
     }
 
-    if ($task.State -eq "Running") {
-        schtasks.exe /End /TN $task.TaskName | Out-Null
-        Start-Sleep -Seconds 2
-    }
+    schtasks.exe /End /TN $taskName | Out-Null
+    Start-Sleep -Seconds 2
 
-    schtasks.exe /Run /TN $task.TaskName | Out-Null
+    schtasks.exe /Run /TN $taskName | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Nao foi possivel iniciar a tarefa agendada '$taskName'."
+    }
 }
 
 function Assert-SupportedPython($PythonExe) {
