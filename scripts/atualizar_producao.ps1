@@ -76,12 +76,32 @@ function Assert-SupportedPython($PythonExe) {
     }
 }
 
+function Invoke-GitPull() {
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & git pull 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($output) {
+        $output | ForEach-Object { Write-Host $_ }
+    }
+
+    if ($exitCode -ne 0) {
+        throw "git pull falhou com codigo $exitCode."
+    }
+}
+
 Write-Step "Entrando no projeto"
 Set-Location -LiteralPath $ProjectDir
 
 Write-Step "Atualizando codigo pelo Git"
-git pull
-
+Invoke-GitPull
 Write-Step "Atualizando dependencias Python"
 if (!(Test-Path -LiteralPath ".\.venv\Scripts\python.exe")) {
     python -m venv .venv
@@ -105,3 +125,4 @@ Restart-OptionalScheduledTask -Name $FrontendTask
 
 Write-Host ""
 Write-Host "Atualizacao concluida." -ForegroundColor Green
+
