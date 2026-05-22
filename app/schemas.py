@@ -42,6 +42,10 @@ class LancamentoSemanalCreate(BaseModel):
     nota: int
     penalidade: bool = False
     motivo_penalidade: str | None = None
+    ajuste_personalizado_descricao: str | None = None
+    ajuste_personalizado_operacao: str | None = None
+    ajuste_personalizado_valor: float = 0
+    ajuste_personalizado_itens: str | None = None
 
 
 class LancamentoMensalCreate(BaseModel):
@@ -75,6 +79,10 @@ class LancamentoSemanalResponse(BaseModel):
     nota: int
     penalidade: bool
     motivo_penalidade: str | None = None
+    ajuste_personalizado_descricao: str | None = None
+    ajuste_personalizado_operacao: str | None = None
+    ajuste_personalizado_valor: float = 0
+    ajuste_personalizado_itens: str | None = None
     bonus_calculado: float
 
     class Config:
@@ -91,6 +99,10 @@ class LancamentoSemanalUpdate(BaseModel):
     nota: int
     penalidade: bool = False
     motivo_penalidade: str | None = None
+    ajuste_personalizado_descricao: str | None = None
+    ajuste_personalizado_operacao: str | None = None
+    ajuste_personalizado_valor: float = 0
+    ajuste_personalizado_itens: str | None = None
 
 class FrequenciaMensalCreate(BaseModel):
     funcionario_id: int

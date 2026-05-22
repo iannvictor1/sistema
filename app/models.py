@@ -32,6 +32,10 @@ class LancamentoSemanal(Base):
     nota = Column(Integer, default=3)
     penalidade = Column(Boolean, default=False)
     motivo_penalidade = Column(String, nullable=True)
+    ajuste_personalizado_descricao = Column(String, nullable=True)
+    ajuste_personalizado_operacao = Column(String, nullable=True)
+    ajuste_personalizado_valor = Column(Float, default=0)
+    ajuste_personalizado_itens = Column(String, nullable=True)
     bonus_calculado = Column(Float, default=0)
 
 

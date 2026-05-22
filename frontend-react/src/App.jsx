@@ -15,6 +15,7 @@
   Pencil,
   BookOpen,
   LogOut,
+  MoreVertical,
   Moon,
   SlidersHorizontal,
   Sun
@@ -48,6 +49,14 @@ const initialEmployee = {
   tipo_entrega: "Não se aplica",
   turno: "Manhã",
 };
+
+const bonusCriteria = [
+  { id: "pedidos_separados", label: "Pedidos separados", type: "number", step: "1" },
+  { id: "pedidos_carregados", label: "Pedidos carregados", type: "number", step: "1" },
+  { id: "toneladas", label: "Toneladas", type: "number", step: "0.1" },
+  { id: "entregas", label: "Entregas", type: "number", step: "1" },
+  { id: "retornos", label: "Retornos", type: "number", step: "1" },
+];
 
 const USERS = {
   admin: "8599256",
@@ -601,6 +610,10 @@ function Entries({ employees, entries, load, mode = "all" }) {
     nota: 3,
     penalidade: false,
     motivo_penalidade: "",
+    ajuste_operacao: "adicionar",
+    ajuste_personalizado_descricao: "pedidos_separados",
+    ajuste_personalizado_valor: 0,
+    ajustes_personalizados: [{ criterio: "pedidos_separados", operacao: "adicionar" }],
   });
   const [month, setMonth] = useState(currentMonthInput());
   const [dayFilter, setDayFilter] = useState("");
@@ -610,6 +623,8 @@ function Entries({ employees, entries, load, mode = "all" }) {
   const [minBonusFilter, setMinBonusFilter] = useState("");
   const [maxBonusFilter, setMaxBonusFilter] = useState("");
   const [message, setMessage] = useState("");
+  const [entryMenuOpen, setEntryMenuOpen] = useState(false);
+  const [customEntryEnabled, setCustomEntryEnabled] = useState(false);
   const employeeMap = useMemo(() => Object.fromEntries(employees.map((employee) => [employee.id, employee])), [employees]);
   const [editingEntry, setEditingEntry] = useState(null);
   const [monthlyForm, setMonthlyForm] = useState({
@@ -670,25 +685,142 @@ function Entries({ employees, entries, load, mode = "all" }) {
   const showForm = mode !== "history";
   const showHistory = mode !== "form";
 
+  function customAdjustments(source) {
+    if (Array.isArray(source.ajustes_personalizados)) return source.ajustes_personalizados;
+
+    if (source.ajuste_personalizado_itens) {
+      try {
+        const parsed = JSON.parse(source.ajuste_personalizado_itens);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        return [];
+      }
+    }
+
+    if (source.ajuste_personalizado_descricao && source.ajuste_personalizado_operacao) {
+      return [{
+        criterio: source.ajuste_personalizado_descricao,
+        operacao: source.ajuste_personalizado_operacao,
+      }];
+    }
+
+    return [];
+  }
+
+  function normalizedCustomAdjustments(source) {
+    return customAdjustments(source)
+      .filter((item) => item.criterio && item.operacao)
+      .map((item) => ({ criterio: item.criterio, operacao: item.operacao }));
+  }
+
+  function hasCustomCriterion(source, criterion, operation) {
+    return customAdjustments(source).some((item) => (
+      item.criterio === criterion && (!operation || item.operacao === operation)
+    ));
+  }
+
+  function isCriterionRemoved(source, criterion) {
+    return hasCustomCriterion(source, criterion, "retirar");
+  }
+
+  function isCriterionAdded(source, criterion) {
+    return hasCustomCriterion(source, criterion, "adicionar");
+  }
+
+  function criterionValue(source, criterion, disabled = false) {
+    if (disabled || isCriterionRemoved(source, criterion)) return 0;
+    return Number(source[criterion] || 0);
+  }
+
+  function customCriterionLabel(criterion) {
+    return bonusCriteria.find((item) => item.id === criterion)?.label || criterion || "-";
+  }
+
+  function customAdjustmentSummary(source) {
+    const adjustments = normalizedCustomAdjustments(source);
+    if (!adjustments.length) return "-";
+
+    return adjustments
+      .map((item) => `${item.operacao === "retirar" ? "Retira" : "Adiciona"} ${customCriterionLabel(item.criterio)}`)
+      .join(", ");
+  }
+
+  function shouldShowCriterion(source, employeeTurn, isDelivery, criterion) {
+    if (isCriterionRemoved(source, criterion)) return false;
+    if (isCriterionAdded(source, criterion)) return true;
+    if (criterion === "toneladas") return !isDelivery && employeeTurn === "manha";
+    if (criterion === "pedidos_separados") return !isDelivery && employeeTurn === "tarde";
+    if (criterion === "pedidos_carregados") return !isDelivery && employeeTurn === "noite";
+    if (["entregas", "retornos"].includes(criterion)) return isDelivery;
+    return false;
+  }
+
+  function updateMetric(source, setter, criterion, value) {
+    setter({ ...source, [criterion]: value });
+  }
+
+  function addCustomAdjustment(source, setter) {
+    setter({
+      ...source,
+      ajustes_personalizados: [
+        ...customAdjustments(source),
+        { criterio: "pedidos_separados", operacao: "adicionar" },
+      ],
+    });
+  }
+
+  function updateCustomAdjustment(source, setter, index, field, value) {
+    const adjustments = customAdjustments(source).map((item, currentIndex) => (
+      currentIndex === index ? { ...item, [field]: value } : item
+    ));
+    setter({ ...source, ajustes_personalizados: adjustments });
+  }
+
+  function removeCustomAdjustment(source, setter, index) {
+    const adjustments = customAdjustments(source).filter((_, currentIndex) => currentIndex !== index);
+    setter({ ...source, ajustes_personalizados: adjustments });
+  }
+
+  function withoutCustomAdjustments(source) {
+    return { ...source, ajustes_personalizados: [], ajuste_personalizado_itens: null };
+  }
+
   async function saveEntry(event) {
     event.preventDefault();
+    const adjustments = customEntryEnabled ? normalizedCustomAdjustments(form) : [];
+    const formRules = customEntryEnabled ? form : withoutCustomAdjustments(form);
+    const firstAdjustment = adjustments[0] || {};
     const payload = {
       ...form,
       funcionario_id: Number(form.funcionario_id),
       semana: form.tipo_lancamento === "diario" ? weekLabel(form.data_lancamento) : weekLabel(form.data_lancamento),
       data_lancamento: form.data_lancamento,
-      pedidos_separados: Number(form.pedidos_separados),
-      pedidos_carregados: Number(form.pedidos_carregados),
-      toneladas: selectedEmployeeIsDelivery ? 0 : Number(form.toneladas),
-      entregas: Number(form.entregas || 0),
-      retornos: Number(form.retornos || 0),
+      pedidos_separados: criterionValue(formRules, "pedidos_separados"),
+      pedidos_carregados: criterionValue(formRules, "pedidos_carregados"),
+      toneladas: criterionValue(formRules, "toneladas", selectedEmployeeIsDelivery && !isCriterionAdded(formRules, "toneladas")),
+      entregas: criterionValue(formRules, "entregas"),
+      retornos: criterionValue(formRules, "retornos"),
       nota: Number(form.nota),
       motivo_penalidade: form.penalidade ? form.motivo_penalidade : null,
+      ajuste_personalizado_descricao: firstAdjustment.criterio || null,
+      ajuste_personalizado_operacao: firstAdjustment.operacao || null,
+      ajuste_personalizado_valor: firstAdjustment.criterio ? criterionValue(form, firstAdjustment.criterio) : 0,
+      ajuste_personalizado_itens: adjustments.length ? JSON.stringify(adjustments) : null,
     };
     setMessage("");
     try {
       const saved = await api.post("/lancamentos-semanais", payload);
       await load();
+      setCustomEntryEnabled(false);
+      setForm((current) => ({
+        ...current,
+        pedidos_separados: 0,
+        pedidos_carregados: 0,
+        toneladas: 0,
+        entregas: 0,
+        retornos: 0,
+        ajustes_personalizados: [{ criterio: "pedidos_separados", operacao: "adicionar" }],
+      }));
       setMessage(`Lançamento salvo. Bônus: ${currency.format(Number(saved.bonus_calculado || 0))}`);
     } catch (err) {
       setMessage(errorMessage(err));
@@ -771,21 +903,27 @@ function Entries({ employees, entries, load, mode = "all" }) {
   async function updateEntry(event) {
     event.preventDefault();
     setMessage("");
+    const adjustments = normalizedCustomAdjustments(editingEntry);
+    const firstAdjustment = adjustments[0] || {};
 
     try {
       await api.put(`/lancamentos-semanais/${editingEntry.id}`, {
         semana: editingEntry.semana,
         data_lancamento: editingEntry.data_lancamento,
-        pedidos_separados: Number(editingEntry.pedidos_separados),
-        pedidos_carregados: Number(editingEntry.pedidos_carregados),
-        toneladas: editingEmployeeIsDelivery ? 0 : Number(editingEntry.toneladas),
-        entregas: Number(editingEntry.entregas || 0),
-        retornos: Number(editingEntry.retornos || 0),
+        pedidos_separados: criterionValue(editingEntry, "pedidos_separados"),
+        pedidos_carregados: criterionValue(editingEntry, "pedidos_carregados"),
+        toneladas: criterionValue(editingEntry, "toneladas", editingEmployeeIsDelivery && !isCriterionAdded(editingEntry, "toneladas")),
+        entregas: criterionValue(editingEntry, "entregas"),
+        retornos: criterionValue(editingEntry, "retornos"),
         nota: Number(editingEntry.nota),
         penalidade: Boolean(editingEntry.penalidade),
         motivo_penalidade: editingEntry.penalidade
         ? editingEntry.motivo_penalidade
         : null,
+        ajuste_personalizado_descricao: firstAdjustment.criterio || null,
+        ajuste_personalizado_operacao: firstAdjustment.operacao || null,
+        ajuste_personalizado_valor: firstAdjustment.criterio ? criterionValue(editingEntry, firstAdjustment.criterio) : 0,
+        ajuste_personalizado_itens: adjustments.length ? JSON.stringify(adjustments) : null,
       });
 
       setEditingEntry(null);
@@ -806,24 +944,19 @@ function Entries({ employees, entries, load, mode = "all" }) {
         <input value={editingEntry.semana} onChange={(event) => setEditingEntry({ ...editingEntry, semana: event.target.value })} required />
         <input type="date" value={editingEntry.data_lancamento || ""} onChange={(event) => setEditingEntry({ ...editingEntry, data_lancamento: event.target.value })} />
 
-        {!editingEmployeeIsDelivery && editingEmployeeTurn === "manha" && (
-          <input min="0" step="0.1" type="number" placeholder="Toneladas" value={editingEntry.toneladas} onChange={(event) => setEditingEntry({ ...editingEntry, pedidos_separados: 0, pedidos_carregados: 0, toneladas: event.target.value })} />
-        )}
-
-        {!editingEmployeeIsDelivery && editingEmployeeTurn === "tarde" && (
-          <input min="0" type="number" placeholder="Pedidos separados" value={editingEntry.pedidos_separados} onChange={(event) => setEditingEntry({ ...editingEntry, pedidos_separados: event.target.value, pedidos_carregados: 0, toneladas: 0 })} />
-        )}
-
-        {!editingEmployeeIsDelivery && editingEmployeeTurn === "noite" && (
-          <input min="0" type="number" placeholder="Pedidos carregados" value={editingEntry.pedidos_carregados} onChange={(event) => setEditingEntry({ ...editingEntry, pedidos_separados: 0, pedidos_carregados: event.target.value, toneladas: 0 })} />
-        )}
-
-        {editingEmployeeIsDelivery && (
-          <>
-            <input min="0" type="number" placeholder="Entregas" value={editingEntry.entregas || 0} onChange={(event) => setEditingEntry({ ...editingEntry, entregas: event.target.value })} />
-            <input min="0" type="number" placeholder="Retornos" value={editingEntry.retornos || 0} onChange={(event) => setEditingEntry({ ...editingEntry, retornos: event.target.value })} />
-          </>
-        )}
+        {bonusCriteria.map((criterion) => (
+          shouldShowCriterion(editingEntry, editingEmployeeTurn, editingEmployeeIsDelivery, criterion.id) && (
+            <input
+              key={criterion.id}
+              min="0"
+              step={criterion.step}
+              type={criterion.type}
+              placeholder={criterion.label}
+              value={editingEntry[criterion.id] || 0}
+              onChange={(event) => updateMetric(editingEntry, setEditingEntry, criterion.id, event.target.value)}
+            />
+          )
+        ))}
 
         <select value={editingEntry.nota} onChange={(event) => setEditingEntry({ ...editingEntry, nota: event.target.value })}>
           {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
@@ -837,6 +970,26 @@ function Entries({ employees, entries, load, mode = "all" }) {
         {editingEntry.penalidade && (
           <input placeholder="Motivo" value={editingEntry.motivo_penalidade || ""} onChange={(event) => setEditingEntry({ ...editingEntry, motivo_penalidade: event.target.value })} required />
         )}
+
+        <div className="custom-adjustment-fields">
+          {customAdjustments(editingEntry).map((adjustment, index) => (
+            <Fragment key={`${adjustment.criterio}-${index}`}>
+              <select value={adjustment.criterio} onChange={(event) => updateCustomAdjustment(editingEntry, setEditingEntry, index, "criterio", event.target.value)}>
+                {bonusCriteria.map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.label}</option>)}
+              </select>
+              <select value={adjustment.operacao} onChange={(event) => updateCustomAdjustment(editingEntry, setEditingEntry, index, "operacao", event.target.value)}>
+                <option value="adicionar">Adicionar</option>
+                <option value="retirar">Retirar</option>
+              </select>
+              <button className="icon-button danger" onClick={() => removeCustomAdjustment(editingEntry, setEditingEntry, index)} title="Remover critério" type="button">
+                <Trash2 size={16} />
+              </button>
+            </Fragment>
+          ))}
+          <button className="primary wide-button" onClick={() => addCustomAdjustment(editingEntry, setEditingEntry)} type="button">
+            <Plus size={17} /> Adicionar critério
+          </button>
+        </div>
 
         <button className="primary" type="submit"><Save size={17} /> Salvar alterações</button>
         <button className="icon-button" onClick={() => setEditingEntry(null)} type="button">X</button>
@@ -859,7 +1012,40 @@ function Entries({ employees, entries, load, mode = "all" }) {
 
           {form.tipo_lancamento !== "mensal" && (
             <form className="panel form-grid entries-form" onSubmit={saveEntry}>
-          <h2>{form.tipo_lancamento === "diario" ? "Lançamento diário" : "Lançamento semanal"}</h2>
+          <div className="entry-form-title">
+            <h2>{form.tipo_lancamento === "diario" ? "Lançamento diário" : "Lançamento semanal"}</h2>
+            <div className={`entry-actions ${entryMenuOpen ? "open" : ""}`}>
+              <button
+                className="icon-button"
+                onClick={() => setEntryMenuOpen((open) => !open)}
+                title="Mais opções"
+                type="button"
+              >
+                <MoreVertical size={16} />
+              </button>
+              {entryMenuOpen && (
+                <div className="entry-actions-menu">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomEntryEnabled((enabled) => {
+                        if (!enabled && !customAdjustments(form).length) {
+                          setForm({
+                            ...form,
+                            ajustes_personalizados: [{ criterio: "pedidos_separados", operacao: "adicionar" }],
+                          });
+                        }
+                        return !enabled;
+                      });
+                      setEntryMenuOpen(false);
+                    }}
+                  >
+                    Lançamento personalizado
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
           <select
             value={form.funcionario_id}
             onChange={(event) =>
@@ -881,73 +1067,19 @@ function Entries({ employees, entries, load, mode = "all" }) {
             ))}
           </select>
           <input type="date" value={form.data_lancamento} onChange={(event) => setForm({ ...form, data_lancamento: event.target.value })} />
-          {!selectedEmployeeIsDelivery && selectedEmployeeTurn === "manha" && (
-            <input
-              min="0"
-              step="0.1"
-              type="number"
-              placeholder="Toneladas"
-              value={form.toneladas}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  pedidos_separados: 0,
-                  pedidos_carregados: 0,
-                  toneladas: event.target.value,
-                })
-              }
-            />
-          )}
-          {!selectedEmployeeIsDelivery && selectedEmployeeTurn === "tarde" && (
-            <input
-              min="0"
-              type="number"
-              placeholder="Pedidos separados"
-              value={form.pedidos_separados}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  pedidos_separados: event.target.value,
-                  pedidos_carregados: 0,
-                  toneladas: 0,
-                })
-              }
-            />
-          )}
-          {!selectedEmployeeIsDelivery && selectedEmployeeTurn === "noite" && (
-            <input
-              min="0"
-              type="number"
-              placeholder="Pedidos carregados"
-              value={form.pedidos_carregados}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  pedidos_separados: 0,
-                  pedidos_carregados: event.target.value,
-                  toneladas: 0,
-                })
-              }
-            />
-          )}
-          {selectedEmployeeIsDelivery && (
-            <>
+          {bonusCriteria.map((criterion) => (
+            shouldShowCriterion(customEntryEnabled ? form : withoutCustomAdjustments(form), selectedEmployeeTurn, selectedEmployeeIsDelivery, criterion.id) && (
               <input
+                key={criterion.id}
                 min="0"
-                type="number"
-                placeholder="Entregas"
-                value={form.entregas}
-                onChange={(event) => setForm({ ...form, entregas: event.target.value })}
+                step={criterion.step}
+                type={criterion.type}
+                placeholder={criterion.label}
+                value={form[criterion.id]}
+                onChange={(event) => updateMetric(form, setForm, criterion.id, event.target.value)}
               />
-              <input
-                min="0"
-                type="number"
-                placeholder="Retornos"
-                value={form.retornos}
-                onChange={(event) => setForm({ ...form, retornos: event.target.value })}
-              />
-            </>
-          )}
+            )
+          ))}
           <select value={form.nota} onChange={(event) => setForm({ ...form, nota: event.target.value })}>
             {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
           </select>
@@ -956,6 +1088,31 @@ function Entries({ employees, entries, load, mode = "all" }) {
             Penalidade
           </label>
           {form.penalidade && <input placeholder="Motivo" value={form.motivo_penalidade} onChange={(event) => setForm({ ...form, motivo_penalidade: event.target.value })} required />}
+          {customEntryEnabled && (
+            <div className="custom-adjustment-fields">
+              {customAdjustments(form).map((adjustment, index) => (
+                <Fragment key={`${adjustment.criterio}-${index}`}>
+                  <select
+                    value={adjustment.criterio}
+                    onChange={(event) => updateCustomAdjustment(form, setForm, index, "criterio", event.target.value)}
+                    required
+                  >
+                    {bonusCriteria.map((criterion) => <option key={criterion.id} value={criterion.id}>{criterion.label}</option>)}
+                  </select>
+                  <select value={adjustment.operacao} onChange={(event) => updateCustomAdjustment(form, setForm, index, "operacao", event.target.value)}>
+                    <option value="adicionar">Adicionar</option>
+                    <option value="retirar">Retirar</option>
+                  </select>
+                  <button className="icon-button danger" onClick={() => removeCustomAdjustment(form, setForm, index)} title="Remover critério" type="button">
+                    <Trash2 size={16} />
+                  </button>
+                </Fragment>
+              ))}
+              <button className="primary wide-button" onClick={() => addCustomAdjustment(form, setForm)} type="button">
+                <Plus size={17} /> Adicionar critério
+              </button>
+            </div>
+          )}
           <button className="primary" type="submit"><Save size={17} /> Salvar</button>
             </form>
           )}
@@ -1190,7 +1347,7 @@ function Entries({ employees, entries, load, mode = "all" }) {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>ID</th><th>Funcionário</th><th>Tipo</th><th>Semana</th><th>Nota</th><th>Bônus</th><th></th></tr>
+                <tr><th>ID</th><th>Funcionário</th><th>Tipo</th><th>Semana</th><th>Nota</th><th>Ajuste</th><th>Bônus</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredEntries.map((entry) => (
@@ -1201,11 +1358,17 @@ function Entries({ employees, entries, load, mode = "all" }) {
                       <td>{entry.tipo_lancamento}</td>
                       <td>{entry.semana}</td>
                       <td>{entry.nota}</td>
+                      <td>
+                        {customAdjustmentSummary(entry)}
+                      </td>
                       <td>{currency.format(Number(entry.bonus_calculado || 0))}</td>
                       <td>
                         <button 
                           className="icon-button"
-                          onClick={() => setEditingEntry(entry)}
+                          onClick={() => setEditingEntry({
+                            ...entry,
+                            ajustes_personalizados: customAdjustments(entry),
+                          })}
                           title="Editar lançamento"
                           type="button"
                         >
@@ -1220,7 +1383,7 @@ function Entries({ employees, entries, load, mode = "all" }) {
 
                     {editingEntry?.id === entry.id && (
                       <tr className="inline-edit-row">
-                        <td colSpan="7">{renderEntryEditForm()}</td>
+                        <td colSpan="8">{renderEntryEditForm()}</td>
                       </tr>
                     )}
                   </Fragment>

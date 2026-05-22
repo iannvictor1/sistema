@@ -21,6 +21,7 @@ from .calculos import calcular_bonus, calcular_bonus_mensal
 from .export_excel import exportar_fechamento_excel
 from datetime import date
 from pathlib import Path
+import json
 import unicodedata
 
 app = FastAPI(title="Sistema de Bonificação")
@@ -71,6 +72,48 @@ def garantir_colunas_funcionario():
 
 
 garantir_colunas_funcionario()
+
+
+def garantir_colunas_lancamento():
+    if engine.dialect.name != "sqlite":
+        return
+
+    with engine.begin() as conn:
+        colunas = {
+            row[1]
+            for row in conn.execute(text("PRAGMA table_info(lancamentos_semanais)"))
+        }
+
+        if "ajuste_personalizado_descricao" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_descricao TEXT"))
+        if "ajuste_personalizado_operacao" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_operacao TEXT"))
+        if "ajuste_personalizado_valor" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_valor REAL DEFAULT 0"))
+        if "ajuste_personalizado_itens" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_itens TEXT"))
+
+
+garantir_colunas_lancamento()
+
+
+def carregar_ajustes_personalizados(itens: str | None, criterio: str | None = None, operacao: str | None = None):
+    if itens:
+        try:
+            dados = json.loads(itens)
+            if isinstance(dados, list):
+                return [
+                    item for item in dados
+                    if isinstance(item, dict) and item.get("criterio") and item.get("operacao")
+                ]
+        except json.JSONDecodeError:
+            pass
+
+    if criterio and operacao:
+        return [{"criterio": criterio, "operacao": operacao}]
+
+    return []
+
 
 def formatar_mes_para_semana(mes: str) -> str:
     return f"{mes[5:7]}/{mes[:4]}"
@@ -270,7 +313,14 @@ def criar_lancamento_semanal(
         retornos=lancamento.retornos,
         nota=lancamento.nota,
         penalidade=lancamento.penalidade,
-        turno=funcionario.turno
+        turno=funcionario.turno,
+        criterio_personalizado=lancamento.ajuste_personalizado_descricao,
+        operacao_personalizada=lancamento.ajuste_personalizado_operacao,
+        ajustes_personalizados=carregar_ajustes_personalizados(
+            lancamento.ajuste_personalizado_itens,
+            lancamento.ajuste_personalizado_descricao,
+            lancamento.ajuste_personalizado_operacao,
+        ),
     )
 
     novo = LancamentoSemanal(
@@ -288,6 +338,10 @@ def criar_lancamento_semanal(
         nota=lancamento.nota,
         penalidade=lancamento.penalidade,
         motivo_penalidade=motivo_penalidade,
+        ajuste_personalizado_descricao=lancamento.ajuste_personalizado_descricao,
+        ajuste_personalizado_operacao=lancamento.ajuste_personalizado_operacao,
+        ajuste_personalizado_valor=lancamento.ajuste_personalizado_valor,
+        ajuste_personalizado_itens=lancamento.ajuste_personalizado_itens,
         bonus_calculado=bonus
     )
 
@@ -338,7 +392,14 @@ def editar_lancamento_semanal(
         retornos=dados.retornos,
         nota=dados.nota,
         penalidade=dados.penalidade,
-        turno=funcionario.turno
+        turno=funcionario.turno,
+        criterio_personalizado=dados.ajuste_personalizado_descricao,
+        operacao_personalizada=dados.ajuste_personalizado_operacao,
+        ajustes_personalizados=carregar_ajustes_personalizados(
+            dados.ajuste_personalizado_itens,
+            dados.ajuste_personalizado_descricao,
+            dados.ajuste_personalizado_operacao,
+        ),
     )
         
     lancamento.semana = dados.semana
@@ -351,6 +412,10 @@ def editar_lancamento_semanal(
     lancamento.nota = dados.nota
     lancamento.penalidade = dados.penalidade
     lancamento.motivo_penalidade = dados.motivo_penalidade if dados.penalidade else None
+    lancamento.ajuste_personalizado_descricao = dados.ajuste_personalizado_descricao
+    lancamento.ajuste_personalizado_operacao = dados.ajuste_personalizado_operacao
+    lancamento.ajuste_personalizado_valor = dados.ajuste_personalizado_valor
+    lancamento.ajuste_personalizado_itens = dados.ajuste_personalizado_itens
     lancamento.bonus_calculado = bonus
     
     db.commit()
