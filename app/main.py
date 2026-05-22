@@ -37,10 +37,16 @@ Base.metadata.create_all(bind=engine)
 
 
 def garantir_colunas_frequencia():
-    if engine.dialect.name != "sqlite":
-        return
-
     with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS status_mes TEXT DEFAULT 'Normal'"))
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS data_falta DATE"))
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS tipo_falta TEXT"))
+            return
+
+        if engine.dialect.name != "sqlite":
+            return
+
         colunas = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info(frequencias_mensais)"))
@@ -58,10 +64,14 @@ garantir_colunas_frequencia()
 
 
 def garantir_colunas_funcionario():
-    if engine.dialect.name != "sqlite":
-        return
-
     with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(text("ALTER TABLE funcionarios ADD COLUMN IF NOT EXISTS turno TEXT DEFAULT 'Não informado'"))
+            return
+
+        if engine.dialect.name != "sqlite":
+            return
+
         colunas = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info(funcionarios)"))
@@ -75,10 +85,17 @@ garantir_colunas_funcionario()
 
 
 def garantir_colunas_lancamento():
-    if engine.dialect.name != "sqlite":
-        return
-
     with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_descricao TEXT"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_operacao TEXT"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_valor DOUBLE PRECISION DEFAULT 0"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_itens TEXT"))
+            return
+
+        if engine.dialect.name != "sqlite":
+            return
+
         colunas = {
             row[1]
             for row in conn.execute(text("PRAGMA table_info(lancamentos_semanais)"))

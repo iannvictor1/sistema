@@ -1224,7 +1224,7 @@ function Entries({ employees, entries, load, mode = "all" }) {
           )}
 
           <div className="table-wrap" style={{ gridColumn: "1 / -1" }}>
-            <table>
+            <table className="entries-table">
               <thead>
                 <tr><th>Funcionário</th><th>Cargo</th><th>Turno</th><th>Nota</th></tr>
               </thead>
@@ -1358,11 +1358,11 @@ function Entries({ employees, entries, load, mode = "all" }) {
                       <td>{entry.tipo_lancamento}</td>
                       <td>{entry.semana}</td>
                       <td>{entry.nota}</td>
-                      <td>
+                      <td className="adjustment-cell" title={customAdjustmentSummary(entry)}>
                         {customAdjustmentSummary(entry)}
                       </td>
-                      <td>{currency.format(Number(entry.bonus_calculado || 0))}</td>
-                      <td>
+                      <td className="bonus-cell">{currency.format(Number(entry.bonus_calculado || 0))}</td>
+                      <td className="row-actions">
                         <button 
                           className="icon-button"
                           onClick={() => setEditingEntry({
