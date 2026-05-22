@@ -97,6 +97,27 @@ function Invoke-GitPull() {
     }
 }
 
+function Invoke-NpmCommand($Arguments, $FailureMessage) {
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+
+    try {
+        $output = & npm @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
+    if ($output) {
+        $output | ForEach-Object { Write-Host $_ }
+    }
+
+    if ($exitCode -ne 0) {
+        throw "$FailureMessage Codigo: $exitCode."
+    }
+}
+
 Write-Step "Entrando no projeto"
 Set-Location -LiteralPath $ProjectDir
 
@@ -113,8 +134,8 @@ Assert-SupportedPython ".\.venv\Scripts\python.exe"
 
 Write-Step "Atualizando frontend React"
 Set-Location -LiteralPath (Join-Path $ProjectDir "frontend-react")
-npm install
-npm run build
+Invoke-NpmCommand @("install") "npm install falhou."
+Invoke-NpmCommand @("run", "build") "npm run build falhou."
 
 Set-Location -LiteralPath $ProjectDir
 
