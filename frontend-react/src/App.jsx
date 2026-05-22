@@ -50,6 +50,16 @@ const initialEmployee = {
   turno: "Manhã",
 };
 
+function normalizeDeliveryType(value) {
+  const normalized = (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+  return normalized === "entrega" ? "Entrega" : "Não se aplica";
+}
+
 const bonusCriteria = [
   { id: "pedidos_separados", label: "Pedidos separados", type: "number", step: "1" },
   { id: "pedidos_carregados", label: "Pedidos carregados", type: "number", step: "1" },
@@ -441,6 +451,13 @@ function Employees({ employees, load }) {
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState(null);
 
+  function startEditing(employee) {
+    setEditing({
+      ...employee,
+      tipo_entrega: normalizeDeliveryType(employee.tipo_entrega),
+    });
+  }
+
   const filtered = employees.filter((employee) => {
     const text = `${employee.nome} ${employee.cargo} ${employee.turno} ${employee.tipo_entrega}`.toLowerCase();
     return text.includes(search.toLowerCase());
@@ -474,7 +491,7 @@ function Employees({ employees, load }) {
       nome: editing.nome,
       cargo: editing.cargo,
       ativo: editing.ativo,
-      tipo_entrega: editing.tipo_entrega,
+      tipo_entrega: normalizeDeliveryType(editing.tipo_entrega),
       turno: editing.turno,
     });
 
@@ -534,7 +551,7 @@ function Employees({ employees, load }) {
                   <td>
                     <button
                       className="icon-button"
-                      onClick={() => setEditing(employee)}
+                      onClick={() => startEditing(employee)}
                       title="Editar funcionário"
                       type="button"
                     >
