@@ -76,7 +76,7 @@ const USERS = {
   romario: "Cemromario123@",
   ronilson: "Cemroni123@",
   kayke: "Cemkayke123@",
-  Junior: "CemJunior123@"
+  junior: "Cemjunior123@"
 };
 
 function readLoggedUser() {
