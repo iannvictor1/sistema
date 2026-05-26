@@ -155,6 +155,21 @@ def resumir_frequencias(frequencias: list[FrequenciaMensal]) -> tuple[int, str]:
     return 0, "Normal"
 
 
+def nota_atual_lancamentos(lancamentos: list[LancamentoSemanal]) -> int | None:
+    if not lancamentos:
+        return None
+
+    lancamento_atual = max(
+        lancamentos,
+        key=lambda lancamento: (
+            lancamento.data_lancamento or date.min,
+            lancamento.data_registro or date.min,
+            lancamento.id or 0,
+        ),
+    )
+    return lancamento_atual.nota
+
+
 def normalizar_texto(valor: str) -> str:
     texto = (valor or "").strip().lower()
     return "".join(
@@ -697,11 +712,13 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
         ]
 
         if status_mes == "Férias":
+            nota_atual = nota_atual_lancamentos(lancamentos)
             bonus_final = 0.0
             assiduidade = 0.0
             elegivel = True
             ausencias = 0
         else:
+            nota_atual = nota_atual_lancamentos(lancamentos)
             bonus_final = calcular_bonus_mensal(lancamentos, ausencias)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
@@ -713,6 +730,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             "mes": mes,
             "ausencias": ausencias,
             "quantidade_lancamentos": len(lancamentos),
+            "nota_atual": nota_atual,
             "bonus_final": bonus_final,
             "assiduidade": assiduidade,
             "elegivel": elegivel,
@@ -749,6 +767,7 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
             lancamento for lancamento in lancamentos_funcionario
             if lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
         ]
+        nota_atual = nota_atual_lancamentos(lancamentos_mes)
 
         if status_mes == "Férias":
             bonus_final = 0.0
@@ -757,6 +776,7 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
             ausencias = 0
         
         else:
+            nota_atual = nota_atual_lancamentos(lancamentos_mes)
             bonus_final = calcular_bonus_mensal(lancamentos_mes, ausencias)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
@@ -768,6 +788,7 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
             "mes": mes,
             "ausencias": ausencias,
             "quantidade_lancamentos": len(lancamentos_mes),
+            "nota_atual": nota_atual,
             "bonus_final": bonus_final,
             "assiduidade": assiduidade,
             "elegivel": elegivel,

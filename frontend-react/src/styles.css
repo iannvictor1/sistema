@@ -699,6 +699,59 @@ table {
   width: 105px;
 }
 
+.closing-table-wrap {
+  overflow-x: hidden;
+}
+
+.closing-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.closing-table th,
+.closing-table td {
+  padding: 12px 10px;
+  white-space: normal;
+}
+
+.closing-table th:nth-child(1),
+.closing-table td:nth-child(1) {
+  width: 30%;
+}
+
+.closing-table th:nth-child(2),
+.closing-table td:nth-child(2) {
+  width: 20%;
+}
+
+.closing-table th:nth-child(3),
+.closing-table td:nth-child(3) {
+  width: 8%;
+}
+
+.closing-table th:nth-child(4),
+.closing-table td:nth-child(4),
+.closing-table th:nth-child(5),
+.closing-table td:nth-child(5),
+.closing-table th:nth-child(6),
+.closing-table td:nth-child(6) {
+  text-align: center;
+  width: 8%;
+}
+
+.closing-table th:nth-child(7),
+.closing-table td:nth-child(7),
+.closing-table th:nth-child(8),
+.closing-table td:nth-child(8) {
+  text-align: right;
+  width: 9%;
+}
+
+.closing-table td:nth-child(1),
+.closing-table td:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+
 th,
 td {
   border-bottom: 1px solid #e7eef2;
@@ -980,6 +1033,16 @@ td .icon-button + .icon-button {
   .ranking-card {
     grid-template-columns: 1fr;
   }
+
+  .closing-table th,
+  .closing-table td {
+    font-size: 13px;
+    padding: 11px 8px;
+  }
+
+  .closing-table .badge {
+    padding-inline: 8px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1003,5 +1066,65 @@ td .icon-button + .icon-button {
   .wide-button {
     min-width: 0;
     width: 100%;
+  }
+
+  .closing-table-wrap {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .closing-table,
+  .closing-table tbody,
+  .closing-table tr,
+  .closing-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .closing-table thead {
+    display: none;
+  }
+
+  .closing-table tr {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .closing-table td {
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+    min-height: 42px;
+    padding: 10px 12px;
+    text-align: right !important;
+  }
+
+  .closing-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .closing-table td::before {
+    color: var(--muted-strong);
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: left;
+  }
+
+  .closing-table td:first-child,
+  .closing-table td:nth-child(2) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left !important;
   }
 }

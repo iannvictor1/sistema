@@ -1665,21 +1665,22 @@ function Closing() {
 
       {message && <div className="alert error">{message}</div>}
 
-      <div className="table-wrap">
-        <table>
+      <div className="table-wrap closing-table-wrap">
+        <table className="closing-table">
           <thead>
-            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Ausências</th><th>Lançamentos</th><th>Assiduidade</th><th>Bônus final</th></tr>
+            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Nota atual</th><th>Ausências</th><th>Lançamentos</th><th>Assiduidade</th><th>Bônus final</th></tr>
           </thead>
           <tbody>
             {closing.map((item) => (
               <tr key={item.funcionario_id}>
-                <td>{item.funcionario}</td>
-                <td>{item.cargo}</td>
-                <td><span className={item.elegivel ? "badge ok" : "badge danger"}>{item.status_mes === "Férias" ? "Férias" : item.elegivel ? "Elegível" : "Bloqueado"}</span></td>
-                <td>{item.ausencias}</td>
-                <td>{item.quantidade_lancamentos}</td>
-                <td>{currency.format(Number(item.assiduidade || 0))}</td>
-                <td><strong>{currency.format(Number(item.bonus_final || 0))}</strong></td>
+                <td data-label="Funcionário">{item.funcionario}</td>
+                <td data-label="Cargo">{item.cargo}</td>
+                <td data-label="Status"><span className={item.elegivel ? "badge ok" : "badge danger"}>{item.status_mes === "Férias" ? "Férias" : item.elegivel ? "Elegível" : "Bloqueado"}</span></td>
+                <td data-label="Nota atual">{item.nota_atual ?? "-"}</td>
+                <td data-label="Ausências">{item.ausencias}</td>
+                <td data-label="Lançamentos">{item.quantidade_lancamentos}</td>
+                <td data-label="Assiduidade">{currency.format(Number(item.assiduidade || 0))}</td>
+                <td data-label="Bônus final"><strong>{currency.format(Number(item.bonus_final || 0))}</strong></td>
               </tr>
             ))}
           </tbody>

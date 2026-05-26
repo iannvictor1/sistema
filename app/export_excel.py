@@ -44,7 +44,7 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
             cell.border = borda_fina
 
     def estilizar_titulo(ws, titulo):
-        ws.merge_cells("A1:H1")
+        ws.merge_cells("A1:J1")
         ws["A1"] = titulo
         ws["A1"].font = fonte_titulo
         ws["A1"].fill = fill_titulo
@@ -92,6 +92,7 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         "Qtd. Lançamentos",
         "Elegível",
         "Assiduidade",
+        "Nota Atual",
         "Bônus Final",
     ]
 
@@ -118,22 +119,23 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_resumo.cell(linha_atual, 6, item["quantidade_lancamentos"])
         ws_resumo.cell(linha_atual, 7, elegivel)
         ws_resumo.cell(linha_atual, 8, item["assiduidade"])
-        ws_resumo.cell(linha_atual, 9, item["bonus_final"])
+        ws_resumo.cell(linha_atual, 9, item.get("nota_atual") or "-")
+        ws_resumo.cell(linha_atual, 10, item["bonus_final"])
 
-        for col in range(1, 10):
+        for col in range(1, 11):
             ws_resumo.cell(linha_atual, col).border = borda_fina
             ws_resumo.cell(linha_atual, col).alignment = alinhamento_centro if col != 2 and col != 3 else alinhamento_esquerda
             ws_resumo.cell(linha_atual, col).font = fonte_padrao
 
         formatar_moeda(ws_resumo.cell(linha_atual, 8))
-        formatar_moeda(ws_resumo.cell(linha_atual, 9))
+        formatar_moeda(ws_resumo.cell(linha_atual, 10))
 
         if item["elegivel"]:
-            for col in range(1, 10):
+            for col in range(1, 11):
                 ws_resumo.cell(linha_atual, col).fill = fill_elegivel
             total_elegiveis += 1
         else:
-            for col in range(1, 10):
+            for col in range(1, 11):
                 ws_resumo.cell(linha_atual, col).fill = fill_bloqueado
             total_bloqueados += 1
 
@@ -155,7 +157,7 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     ws_resumo.cell(linha_atual + 3, 8, total_bonus)
 
     for r in [linha_atual + 1, linha_atual + 2, linha_atual + 3]:
-        for c in range(1, 9):
+        for c in range(1, 11):
             ws_resumo.cell(r, c).border = borda_fina
             ws_resumo.cell(r, c).font = fonte_negrito
             ws_resumo.cell(r, c).fill = fill_total
@@ -164,7 +166,7 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     formatar_moeda(ws_resumo.cell(linha_atual + 3, 8))
 
     ws_resumo.freeze_panes = "A5"
-    ws_resumo.auto_filter.ref = f"A4:I{max(linha_atual - 1, 4)}"
+    ws_resumo.auto_filter.ref = f"A4:J{max(linha_atual - 1, 4)}"
     
     funcionarios_dict = {f.id: f.nome for f in funcionarios}
 
