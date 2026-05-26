@@ -976,20 +976,108 @@ td .icon-button + .icon-button {
   margin: 24px;
 }
 
-.rules-grid {
+.rules-panel {
+  display: grid;
+  gap: 22px;
+}
+
+.rules-heading {
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding-bottom: 18px;
+}
+
+.rules-heading h2 {
+  margin-bottom: 6px;
+}
+
+.rules-heading p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.rules-heading span {
+  background: var(--brand-soft);
+  border-radius: 999px;
+  color: var(--brand-dark);
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 7px 11px;
+  text-transform: uppercase;
+}
+
+.rules-list {
+  display: grid;
+  gap: 0;
+}
+
+.rule-item {
+  align-items: start;
+  border-bottom: 1px solid var(--line);
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  grid-template-columns: 44px minmax(0, 1fr);
+  padding: 20px 0;
 }
 
-.rules-grid .panel:last-child {
-  grid-column: 1 / -1;
+.rule-item:first-child {
+  padding-top: 0;
 }
 
-.rules-grid p {
+.rule-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.rule-icon {
+  align-items: center;
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in srgb, var(--brand) 18%, var(--line));
+  border-radius: 8px;
+  color: var(--brand-dark);
+  display: inline-flex;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.rule-content {
+  min-width: 0;
+}
+
+.rule-content h3 {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.25;
+  margin: 0 0 8px;
+}
+
+.rule-content p {
   color: var(--muted-strong);
   line-height: 1.58;
-  margin: 0;
+  margin: 0 0 14px;
+  max-width: 820px;
+}
+
+.rule-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rule-values span {
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
+  padding: 7px 10px;
 }
 
 @media (max-width: 1100px) {
@@ -1014,15 +1102,11 @@ td .icon-button + .icon-button {
   .entries-form,
   .metrics,
   .split,
-  .rules-grid,
+  .rules-list,
   .dashboard-filters,
   .advanced-filter-grid,
   .filter-grid {
     grid-template-columns: 1fr;
-  }
-
-  .rules-grid .panel:last-child {
-    grid-column: auto;
   }
 
   .section-heading {
@@ -1061,6 +1145,20 @@ td .icon-button + .icon-button {
 
   .panel {
     padding: 18px;
+  }
+
+  .rules-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .rule-item {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .rule-icon {
+    height: 38px;
+    width: 38px;
   }
 
   .wide-button {

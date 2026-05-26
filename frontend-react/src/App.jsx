@@ -2,6 +2,7 @@
   BarChart3,
   CalendarCheck,
   ChevronDown,
+  Clock,
   FileSpreadsheet,
   History,
   LayoutDashboard,
@@ -17,8 +18,11 @@
   LogOut,
   MoreVertical,
   Moon,
+  Percent,
   SlidersHorizontal,
-  Sun
+  Star,
+  Sun,
+  Truck
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, downloadUrl } from "./api";
@@ -1691,37 +1695,70 @@ function Closing() {
 }
 
 function Rules() {
+  const rules = [
+    {
+      title: "Assiduidade mensal",
+      icon: CalendarCheck,
+      text: "Todo funcionário inicia o mês com o valor de assiduidade. Qualquer ausência registrada no mês remove esse valor.",
+      values: ["R$ 150,00 por mês", "Perde com 1 ausência"],
+    },
+    {
+      title: "Regra por turno",
+      icon: Clock,
+      text: "A base de cálculo muda conforme o turno cadastrado para o funcionário.",
+      values: ["Manhã: R$ 2,00 por tonelada", "Tarde: R$ 0,10 por pedido separado", "Noite: R$ 0,10 por pedido carregado"],
+    },
+    {
+      title: "Funcionários de entrega",
+      icon: Truck,
+      text: "Motoristas e ajudantes entram no mesmo grupo operacional para os lançamentos de entrega. Cada entrega aumenta o bônus e cada retorno desconta do valor.",
+      values: ["Motorista = Entrega", "Ajudante = Entrega", "+ R$ 0,30 por entrega", "- R$ 0,60 por retorno"],
+    },
+    {
+      title: "Nota de desempenho",
+      icon: Star,
+      text: "A nota atual aplica um multiplicador sobre a bonificação calculada no período.",
+      values: ["5: 100%", "4: 90%", "3: 80%", "2: 50%", "1: 20%"],
+    },
+    {
+      title: "Penalidade",
+      icon: Percent,
+      text: "Quando marcada no lançamento, a bonificação é reduzida pela metade e o motivo precisa ficar registrado.",
+      values: ["Redução de 50%", "Motivo obrigatório"],
+    },
+  ];
+
   return (
     <section className="view">
-      <div className="panel rules-grid">
-        <h2>Regras de Negocio</h2>
+      <div className="panel rules-panel">
+        <div className="rules-heading">
+          <div>
+            <h2>Regras de Negócio</h2>
+            <p>Resumo dos critérios usados no cálculo da bonificação.</p>
+          </div>
+          <span>5 regras</span>
+        </div>
 
-        <article>
-          <h3>Assiduidade mensal</h3>
-          <p>Todo funcionário começa o mês com R$ 150,00 de assiduidade. Se tiver qualquer ausência no mês, perde o valor.</p>
-        </article>
+        <div className="rules-list">
+          {rules.map(({ title, icon: Icon, text, values }) => (
+            <article className="rule-item" key={title}>
+              <div className="rule-icon" aria-hidden="true">
+                <Icon size={21} />
+              </div>
 
-        <article>
-          <h3>Regra por turno</h3>
-          <p>Manhã recebe por toneladas: R$ 2,00 por tonelada.</p>
-          <p>Tarde recebe por pedidos separados: R$ 0,10 por pedido.</p>
-          <p>Noite recebe por pedidos carregados: R$ 0,10 por pedido.</p>
-        </article>
+              <div className="rule-content">
+                <h3>{title}</h3>
+                <p>{text}</p>
 
-        <article>
-          <h3>Funcionários de entrega</h3>
-          <p>Motorista e ajudante ficam agrupados como Entrega.</p>
-        </article>
-
-        <article>
-          <h3>Nota de desempenho</h3>
-          <p>Nota 5: 100%, Nota 4: 90%, Nota 3: 80%, Nota 2: 50%, Nota 1: 20%.</p>
-        </article>
-
-        <article>
-          <h3>Penalidade de 50%</h3>
-          <p>Quando marcada, a bonificação é reduzida pela metade e o motivo deve ser informado.</p>
-        </article>
+                <div className="rule-values">
+                  {values.map((value) => (
+                    <span key={value}>{value}</span>
+                  ))}
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );
