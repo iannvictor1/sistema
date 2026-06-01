@@ -223,8 +223,8 @@ export function App() {
 
         {!data.loading && activeTab === "dashboard" && <Dashboard {...data} />}
         {!data.loading && activeTab === "funcionarios" && <Employees {...data} />}
-        {!data.loading && activeTab === "lancamentos" && <Entries {...data} mode="form" />}
-        {!data.loading && activeTab === "historico-lancamentos" && <Entries {...data} mode="history" />}
+        {!data.loading && activeTab === "lancamentos" && <Entries {...data} mode="form" loggedUser={loggedUser} />}
+        {!data.loading && activeTab === "historico-lancamentos" && <Entries {...data} mode="history" loggedUser={loggedUser} />}
         {!data.loading && activeTab === "frequencias" && <Frequencies {...data} />}
         {!data.loading && activeTab === "fechamento" && <Closing {...data} />}
         {!data.loading && activeTab === "regras" && <Rules />}
@@ -619,7 +619,7 @@ function Employees({ employees, load }) {
   );
 }
 
-function Entries({ employees, entries, load, mode = "all" }) {
+function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   const [form, setForm] = useState({
     funcionario_id: "",
     tipo_lancamento: "semanal",
@@ -816,6 +816,7 @@ function Entries({ employees, entries, load, mode = "all" }) {
       ...form,
       funcionario_id: Number(form.funcionario_id),
       semana: form.tipo_lancamento === "diario" ? weekLabel(form.data_lancamento) : weekLabel(form.data_lancamento),
+      usuario_lancamento: loggedUser || null,
       data_lancamento: form.data_lancamento,
       pedidos_separados: criterionValue(formRules, "pedidos_separados"),
       pedidos_carregados: criterionValue(formRules, "pedidos_carregados"),
@@ -876,7 +877,7 @@ function Entries({ employees, entries, load, mode = "all" }) {
         mes: monthlyForm.mes,
         filtro_turno: monthlyForm.filtro_turno,
         tipo_funcionario: monthlyForm.tipo_funcionario,
-        usuario_lancamento: null,
+        usuario_lancamento: loggedUser || null,
         pedidos_separados: Number(monthlyForm.pedidos_separados),
         pedidos_carregados: Number(monthlyForm.pedidos_carregados),
         toneladas: monthlyIsDelivery ? 0 : Number(monthlyForm.toneladas),
