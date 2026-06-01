@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -200,6 +200,15 @@ def get_db():
         db.close()
 
 
+def usuario_da_requisicao(valor_payload: str | None, request: Request) -> str | None:
+    usuario = (valor_payload or "").strip()
+    if usuario:
+        return usuario
+
+    usuario_header = (request.headers.get("X-Bonificacao-User") or "").strip()
+    return usuario_header or None
+
+
 @app.get("/")
 def home():
     if FRONTEND_INDEX.exists():
@@ -317,6 +326,7 @@ def excluir_funcionario(
 @app.post("/lancamentos-semanais", response_model=LancamentoSemanalResponse)
 def criar_lancamento_semanal(
     lancamento: LancamentoSemanalCreate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     funcionario = (
@@ -361,7 +371,7 @@ def criar_lancamento_semanal(
         tipo_lancamento=lancamento.tipo_lancamento,
         data_lancamento=lancamento.data_lancamento,
         data_registro=date.today(),
-        usuario_lancamento=lancamento.usuario_lancamento,
+        usuario_lancamento=usuario_da_requisicao(lancamento.usuario_lancamento, request),
         pedidos_separados=lancamento.pedidos_separados,
         pedidos_carregados=lancamento.pedidos_carregados,
         toneladas=lancamento.toneladas,
@@ -458,6 +468,7 @@ def editar_lancamento_semanal(
 @app.post("/lancamentos-mensais", response_model=list[LancamentoSemanalResponse])
 def criar_lancamento_mensal(
     lancamento: LancamentoMensalCreate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     turnos = turnos_do_filtro(lancamento.filtro_turno)
@@ -504,7 +515,7 @@ def criar_lancamento_mensal(
             tipo_lancamento="mensal",
             data_lancamento=data_lancamento,
             data_registro=date.today(),
-            usuario_lancamento=lancamento.usuario_lancamento,
+            usuario_lancamento=usuario_da_requisicao(lancamento.usuario_lancamento, request),
             pedidos_separados=lancamento.pedidos_separados,
             pedidos_carregados=lancamento.pedidos_carregados,
             toneladas=lancamento.toneladas,

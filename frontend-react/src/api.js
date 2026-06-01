@@ -1,9 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? "/api" : "");
 
 async function request(path, options = {}) {
+  const loggedUser = localStorage.getItem("bonificacao_user");
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(loggedUser ? { "X-Bonificacao-User": loggedUser } : {}),
       ...options.headers,
     },
     ...options,
