@@ -304,12 +304,13 @@ function Dashboard({ employees, entries }) {
   }, [month]);
 
   const monthEntries = entries.filter((entry) => belongsToMonth(entry, month));
-  const weeks = [...new Set(monthEntries.map((entry) => entry.semana).filter(Boolean))].sort();
-  const filteredEntries = entries.filter((entry) => {
+  const hasDateRange = Boolean(periodStart || periodEnd);
+  const selectedYear = month.slice(0, 4);
+  const scopeEntries = dateScope === "Ano" || hasDateRange ? entries : monthEntries;
+  const filteredEntries = scopeEntries.filter((entry) => {
     const entryDate = entry.data_lancamento || "";
     const entryMonth = entryDate.slice(0, 7);
     const entryYear = entryDate.slice(0, 4);
-    const selectedYear = month.slice(0, 4);
 
     const matchesDateScope =
       dateScope === "Todos" ||
@@ -326,10 +327,30 @@ function Dashboard({ employees, entries }) {
   });
   const hasAdvancedFilters = Boolean(periodStart || periodEnd || dateScope !== "Todos" || weekFilter !== "Todos");
   const dashboardEntries = hasAdvancedFilters ? filteredEntries : monthEntries;
+  const weeks = [...new Set(scopeEntries.map((entry) => entry.semana).filter(Boolean))].sort();
+  const weekOptionsKey = weeks.join("|");
   const filteredEmployeeIds = new Set(dashboardEntries.map((entry) => entry.funcionario_id));
-  const rankingItems = hasAdvancedFilters
-    ? closing.filter((item) => filteredEmployeeIds.has(item.funcionario_id))
-    : closing;
+  const employeeById = new Map(employees.map((employee) => [employee.id, employee]));
+  const closingByEmployee = new Map(closing.map((item) => [item.funcionario_id, item]));
+  const filteredRankingItems = [...dashboardEntries.reduce((items, entry) => {
+    const employee = employeeById.get(entry.funcionario_id);
+    const current = items.get(entry.funcionario_id) || {
+      funcionario_id: entry.funcionario_id,
+      funcionario: employee?.nome || `Funcionário #${entry.funcionario_id}`,
+      cargo: employee?.cargo || "-",
+      bonus_final: 0,
+      quantidade_lancamentos: 0,
+      elegivel: closingByEmployee.get(entry.funcionario_id)?.elegivel ?? true,
+      assiduidade: 0,
+    };
+
+    current.bonus_final += Number(entry.bonus_calculado || 0);
+    current.quantidade_lancamentos += 1;
+    items.set(entry.funcionario_id, current);
+    return items;
+  }, new Map()).values()];
+  const useFilteredRanking = hasAdvancedFilters && !(dateScope === "Mês" && !periodStart && !periodEnd && weekFilter === "Todos");
+  const rankingItems = useFilteredRanking ? filteredRankingItems : closing;
   const activeEmployees = employees.filter((employee) => employee.ativo);
   const visibleActiveEmployees = hasAdvancedFilters
     ? activeEmployees.filter((employee) => filteredEmployeeIds.has(employee.id))
@@ -338,6 +359,13 @@ function Dashboard({ employees, entries }) {
   const blocked = rankingItems.filter((item) => !item.elegivel).length;
   const eligible = rankingItems.filter((item) => item.elegivel).length;
   const assiduity = rankingItems.reduce((sum, item) => sum + Number(item.assiduidade || 0), 0);
+
+  useEffect(() => {
+    const weekOptions = weekOptionsKey ? weekOptionsKey.split("|") : [];
+    if (weekFilter !== "Todos" && !weekOptions.includes(weekFilter)) {
+      setWeekFilter("Todos");
+    }
+  }, [weekFilter, weekOptionsKey]);
 
   function clearDashboardFilters() {
     setPeriodStart("");
