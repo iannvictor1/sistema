@@ -1,4 +1,5 @@
 import unicodedata
+import json
 
 
 def normalizar_texto(valor: str) -> str:
@@ -110,10 +111,68 @@ def calcular_bonus(
     return round(base * fator, 2)
 
 
-def calcular_bonus_mensal(lancamentos, ausencias: int) -> float:
+def fator_da_nota(nota: int | None) -> float:
+    fatores = {
+        5: 1.0,
+        4: 0.9,
+        3: 0.8,
+        2: 0.5,
+        1: 0.2,
+    }
+    return fatores.get(nota, 0)
+
+
+def carregar_ajustes_personalizados_lancamento(lancamento) -> list[dict]:
+    itens = getattr(lancamento, "ajuste_personalizado_itens", None)
+    if itens:
+        try:
+            dados = json.loads(itens)
+            if isinstance(dados, list):
+                return [
+                    item for item in dados
+                    if isinstance(item, dict) and item.get("criterio") and item.get("operacao")
+                ]
+        except json.JSONDecodeError:
+            pass
+
+    criterio = getattr(lancamento, "ajuste_personalizado_descricao", None)
+    operacao = getattr(lancamento, "ajuste_personalizado_operacao", None)
+    if criterio and operacao:
+        return [{"criterio": criterio, "operacao": operacao}]
+
+    return []
+
+
+def calcular_base_lancamento(lancamento, funcionario=None) -> float:
+    funcionario = funcionario or getattr(lancamento, "funcionario", None)
+    tipo_entrega = getattr(funcionario, "tipo_entrega", "") if funcionario else ""
+    turno = getattr(funcionario, "turno", "Nao informado") if funcionario else "Nao informado"
+
+    return calcular_bonus(
+        tipo_entrega=tipo_entrega,
+        pedidos_separados=lancamento.pedidos_separados or 0,
+        pedidos_carregados=lancamento.pedidos_carregados or 0,
+        toneladas=lancamento.toneladas or 0,
+        entregas=lancamento.entregas or 0,
+        retornos=lancamento.retornos or 0,
+        nota=5,
+        penalidade=bool(lancamento.penalidade),
+        turno=turno,
+        criterio_personalizado=getattr(lancamento, "ajuste_personalizado_descricao", None),
+        operacao_personalizada=getattr(lancamento, "ajuste_personalizado_operacao", None),
+        ajustes_personalizados=carregar_ajustes_personalizados_lancamento(lancamento),
+    )
+
+
+def calcular_bonus_mensal(lancamentos, ausencias: int, nota_atual: int | None = None, funcionario=None) -> float:
     if ausencias > 0:
         return 0.0
 
-    total = sum(l.bonus_calculado for l in lancamentos)
+    if nota_atual is None:
+        total = sum(l.bonus_calculado for l in lancamentos)
+    else:
+        base_periodo = sum(calcular_base_lancamento(l, funcionario) for l in lancamentos)
+        total = base_periodo * fator_da_nota(nota_atual)
+
     total += 150.0
     return round(total, 2)

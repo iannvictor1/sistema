@@ -730,7 +730,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             ausencias = 0
         else:
             nota_atual = nota_atual_lancamentos(lancamentos)
-            bonus_final = calcular_bonus_mensal(lancamentos, ausencias)
+            bonus_final = calcular_bonus_mensal(lancamentos, ausencias, nota_atual, funcionario)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
 
@@ -788,7 +788,7 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
         
         else:
             nota_atual = nota_atual_lancamentos(lancamentos_mes)
-            bonus_final = calcular_bonus_mensal(lancamentos_mes, ausencias)
+            bonus_final = calcular_bonus_mensal(lancamentos_mes, ausencias, nota_atual, funcionario)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
 
