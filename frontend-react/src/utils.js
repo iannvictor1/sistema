@@ -11,8 +11,12 @@ export function currentMonthInput() {
   return todayInput().slice(0, 7);
 }
 
+export function isValidMonthInput(month) {
+  return /^\d{4}-\d{2}$/.test(month || "");
+}
+
 export function monthLabel(month) {
-  if (!month) return "";
+  if (!isValidMonthInput(month)) return "";
   const [year, value] = month.split("-");
   return `${value}/${year}`;
 }
@@ -35,6 +39,7 @@ export function weekLabel(dateText) {
 }
 
 export function belongsToMonth(entry, month) {
+  if (!isValidMonthInput(month)) return false;
   const label = monthLabel(month);
   if (entry.data_lancamento && entry.data_lancamento.startsWith(month)) return true;
   return String(entry.semana || "").includes(label);

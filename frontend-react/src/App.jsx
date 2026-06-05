@@ -32,6 +32,7 @@ import {
   currentMonthInput,
   employeeLabel,
   errorMessage,
+  isValidMonthInput,
   todayInput,
   weekLabel,
 } from "./utils";
@@ -288,6 +289,7 @@ function LoginScreen({ onLogin }) {
 
 function Dashboard({ employees, entries }) {
   const [month, setMonth] = useState(currentMonthInput());
+  const [selectedMonth, setSelectedMonth] = useState(month);
   const [closing, setClosing] = useState([]);
   const [error, setError] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -297,15 +299,16 @@ function Dashboard({ employees, entries }) {
   const [weekFilter, setWeekFilter] = useState("Todos");
 
   useEffect(() => {
+    setError("");
     api
-      .get(`/fechamento/${month}`)
-      .then(setClosing)
+      .get(`/fechamento/${selectedMonth}`)
+      .then((data) => setClosing(Array.isArray(data) ? data : []))
       .catch((err) => setError(errorMessage(err)));
-  }, [month]);
+  }, [selectedMonth]);
 
-  const monthEntries = entries.filter((entry) => belongsToMonth(entry, month));
+  const monthEntries = entries.filter((entry) => belongsToMonth(entry, selectedMonth));
   const hasDateRange = Boolean(periodStart || periodEnd);
-  const selectedYear = month.slice(0, 4);
+  const selectedYear = selectedMonth.slice(0, 4);
   const scopeEntries = dateScope === "Ano" || hasDateRange ? entries : monthEntries;
   const filteredEntries = scopeEntries.filter((entry) => {
     const entryDate = entry.data_lancamento || "";
@@ -315,7 +318,7 @@ function Dashboard({ employees, entries }) {
     const matchesDateScope =
       dateScope === "Todos" ||
       (dateScope === "Ano" && entryYear === selectedYear) ||
-      (dateScope === "Mês" && entryMonth === month) ||
+      (dateScope === "Mês" && entryMonth === selectedMonth) ||
       (dateScope === "Data" && (!periodStart || entryDate === periodStart));
 
     return (
@@ -374,13 +377,20 @@ function Dashboard({ employees, entries }) {
     setWeekFilter("Todos");
   }
 
+  function changeDashboardMonth(value) {
+    setMonth(value);
+    if (isValidMonthInput(value)) {
+      setSelectedMonth(value);
+    }
+  }
+
   return (
     <section className="view">
       <div className="dashboard-filters">
         <div className="toolbar">
           <label>
             Mês
-            <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+            <input type="month" value={month} onChange={(event) => changeDashboardMonth(event.target.value)} />
           </label>
         </div>
 
@@ -1667,15 +1677,26 @@ function Frequencies({ employees, frequencies, load }) {
 
 function Closing() {
   const [month, setMonth] = useState(currentMonthInput());
+  const [selectedMonth, setSelectedMonth] = useState(month);
   const [closing, setClosing] = useState([]);
   const [message, setMessage] = useState("");
 
   async function calculate() {
     setMessage("");
+    if (!isValidMonthInput(selectedMonth)) return;
+
     try {
-      setClosing(await api.get(`/fechamento/${month}`));
+      const data = await api.get(`/fechamento/${selectedMonth}`);
+      setClosing(Array.isArray(data) ? data : []);
     } catch (err) {
       setMessage(errorMessage(err));
+    }
+  }
+
+  function changeClosingMonth(value) {
+    setMonth(value);
+    if (isValidMonthInput(value)) {
+      setSelectedMonth(value);
     }
   }
 
@@ -1688,10 +1709,10 @@ function Closing() {
       <div className="toolbar">
         <label>
           Mês
-          <input type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
+          <input type="month" value={month} onChange={(event) => changeClosingMonth(event.target.value)} />
         </label>
         <button className="primary" onClick={calculate} type="button"><BarChart3 size={17} /> Calcular</button>
-        <a className="button-link" href={downloadUrl(`/exportar-fechamento/${month}`)}>
+        <a className="button-link" href={downloadUrl(`/exportar-fechamento/${selectedMonth}`)}>
           <FileSpreadsheet size={17} /> Excel
         </a>
       </div>
