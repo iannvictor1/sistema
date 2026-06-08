@@ -559,6 +559,7 @@ function Employees({ employees, load }) {
           <option>Manhã</option>
           <option>Tarde</option>
           <option>Noite</option>
+          <option>Horário comercial</option>
         </select>
         <label className="check">
           <input checked={form.ativo} type="checkbox" onChange={(event) => setForm({ ...form, ativo: event.target.checked })} />
@@ -630,6 +631,7 @@ function Employees({ employees, load }) {
                           <option>Manhã</option>
                           <option>Tarde</option>
                           <option>Noite</option>
+                          <option>Horário comercial</option>
                         </select>
 
                         <label className="check">
@@ -742,6 +744,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   const editingEmployeeTurn = normalizeText(editingEmployee?.turno);
   const editingEmployeeIsDelivery = isDeliveryEmployee(editingEmployee);
   const monthlyIsDelivery = normalizeText(monthlyForm.tipo_funcionario) === "entrega";
+  const monthlyIsCommercialHours = normalizeText(monthlyForm.filtro_turno) === "horario comercial";
   const showForm = mode !== "history";
   const showHistory = mode !== "form";
 
@@ -806,6 +809,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   }
 
   function shouldShowCriterion(source, employeeTurn, isDelivery, criterion) {
+    if (employeeTurn === "horario comercial") return false;
     if (isCriterionRemoved(source, criterion)) return false;
     if (isCriterionAdded(source, criterion)) return true;
     if (criterion === "toneladas") return !isDelivery && employeeTurn === "manha";
@@ -916,11 +920,11 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
         filtro_turno: monthlyForm.filtro_turno,
         tipo_funcionario: monthlyForm.tipo_funcionario,
         usuario_lancamento: loggedUser || null,
-        pedidos_separados: Number(monthlyForm.pedidos_separados),
-        pedidos_carregados: Number(monthlyForm.pedidos_carregados),
-        toneladas: monthlyIsDelivery ? 0 : Number(monthlyForm.toneladas),
-        entregas: Number(monthlyForm.entregas || 0),
-        retornos: Number(monthlyForm.retornos || 0),
+        pedidos_separados: monthlyIsCommercialHours ? 0 : Number(monthlyForm.pedidos_separados),
+        pedidos_carregados: monthlyIsCommercialHours ? 0 : Number(monthlyForm.pedidos_carregados),
+        toneladas: monthlyIsDelivery || monthlyIsCommercialHours ? 0 : Number(monthlyForm.toneladas),
+        entregas: monthlyIsCommercialHours ? 0 : Number(monthlyForm.entregas || 0),
+        retornos: monthlyIsCommercialHours ? 0 : Number(monthlyForm.retornos || 0),
         notas: notes,
       });
 
@@ -1191,12 +1195,22 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           <select
             value={monthlyForm.filtro_turno}
             onChange={(event) =>
-              setMonthlyForm({ ...monthlyForm, filtro_turno: event.target.value, notas: {} })
+              setMonthlyForm({
+                ...monthlyForm,
+                filtro_turno: event.target.value,
+                pedidos_separados: 0,
+                pedidos_carregados: 0,
+                toneladas: 0,
+                entregas: 0,
+                retornos: 0,
+                notas: {},
+              })
             }
           >
             <option value="Manhã">Manhã</option>
             <option value="Tarde">Tarde</option>
             <option value="Noite">Noite</option>
+            <option value="Horário comercial">Horário comercial</option>
           </select>
 
           <select
@@ -1261,7 +1275,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
             />
           )}
 
-          {monthlyIsDelivery && (
+          {monthlyIsDelivery && !monthlyIsCommercialHours && (
             <>
               <input
                 min="0"
@@ -1379,6 +1393,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                 <option>Manhã</option>
                 <option>Tarde</option>
                 <option>Noite</option>
+                <option>Horário comercial</option>
               </select>
             </label>
 
@@ -1756,7 +1771,7 @@ function Rules() {
       title: "Regra por turno",
       icon: Clock,
       text: "A base de cálculo muda conforme o turno cadastrado para o funcionário.",
-      values: ["Manhã: R$ 2,00 por tonelada", "Tarde: R$ 0,10 por pedido separado", "Noite: R$ 0,10 por pedido carregado"],
+      values: ["Manhã: R$ 2,00 por tonelada", "Tarde: R$ 0,10 por pedido separado", "Noite: R$ 0,10 por pedido carregado", "Horário comercial: apenas assiduidade"],
     },
     {
       title: "Funcionários de entrega",

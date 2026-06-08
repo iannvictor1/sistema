@@ -17,7 +17,7 @@ def render_cadastro(API_URL: str):
 
         turno = st.selectbox(
             "Turno",
-            ["Manhã", "Tarde", "Noite"],
+            ["Manhã", "Tarde", "Noite", "Horário comercial"],
             key="cad_turno"
         )
 

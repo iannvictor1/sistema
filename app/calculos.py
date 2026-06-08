@@ -60,6 +60,9 @@ def calcular_bonus(
     criterios_adicionados.discard("")
     criterios_removidos.discard("")
 
+    if turno_normalizado == "horario comercial":
+        return 0.0
+
     funcionario_entrega = recebe_bonus_entrega(tipo_entrega)
     turno_sem_regra = turno_normalizado not in {"manha", "tarde", "noite"}
 

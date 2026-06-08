@@ -68,7 +68,7 @@ def render_historico_lancamentos(API_URL: str):
             with col_turno:
                 filtro_turno = st.selectbox(
                     "Turno",
-                    ["Todos", "Manhã", "Tarde", "Noite"],
+                    ["Todos", "Manhã", "Tarde", "Noite", "Horário comercial"],
                     key="filtro_turno_lancamentos"
                 )
 
@@ -309,6 +309,9 @@ def render_historico_lancamentos(API_URL: str):
                                 index=[1, 2, 3, 4, 5].index(int(l["nota"])),
                                 key=f"edit_nota_{l['id']}"
                             )
+                    elif turno_funcionario == "Horário comercial":
+                        nova_nota = int(l["nota"])
+                        st.info("Este turno recebe apenas assiduidade no fechamento mensal.")
                     else:
                         col1, col2, col3, col4 = st.columns(4)
 

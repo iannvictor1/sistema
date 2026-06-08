@@ -43,7 +43,7 @@ def _render_lancamento_mensal(API_URL: str, funcionarios: list[dict]):
     with col_turno:
         filtro_turno = st.selectbox(
             "Turno",
-            ["Manhã", "Tarde", "Noite"],
+            ["Manhã", "Tarde", "Noite", "Horário comercial"],
             key="lanc_mensal_turno"
         )
 
@@ -94,6 +94,8 @@ def _render_lancamento_mensal(API_URL: str, funcionarios: list[dict]):
             value=0,
             key="lanc_mensal_pedidos_car"
         )
+    elif filtro_turno == "Horário comercial":
+        st.info("Este turno recebe apenas assiduidade no fechamento mensal.")
 
     st.markdown("### Notas individuais")
     notas = {}
@@ -272,6 +274,9 @@ def render_lancamento(API_URL: str):
                     index=2,
                     key="lanc_nota"
                 )
+        elif turno_funcionario == "Horário comercial":
+            nota = 5
+            st.info("Este turno recebe apenas assiduidade no fechamento mensal.")
         else:
             col1, col2, col3, col4 = st.columns(4)
 

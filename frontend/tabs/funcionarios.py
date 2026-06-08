@@ -143,7 +143,7 @@ def render_funcionarios(API_URL: str):
                     key=f"edit_func_tipo_entrega_{f['id']}"
                 )
 
-                opcoes_turno = ["Manhã", "Tarde", "Noite"]
+                opcoes_turno = ["Manhã", "Tarde", "Noite", "Horário comercial"]
                 turno_atual = f.get("turno", "Manhã")
                 index_turno = opcoes_turno.index(turno_atual) if turno_atual in opcoes_turno else 0
 

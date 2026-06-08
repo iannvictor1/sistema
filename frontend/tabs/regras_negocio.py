@@ -21,6 +21,8 @@ def render_regras(API_URL: str):
         <br><br>
         Noite recebe apenas por pedidos carregados.
         <br>• Pedidos carregados: <span class="valor-bonus">R$ 0,10</span> por pedido
+        <br><br>
+        Horário comercial recebe apenas assiduidade.
     </div>
 
     <div class="card-item">
