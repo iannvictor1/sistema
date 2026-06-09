@@ -1421,7 +1421,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           </div>
 
           <div className="table-wrap">
-            <table>
+            <table className="history-table">
               <thead>
                 <tr><th>ID</th><th>Funcionário</th><th>Tipo</th><th>Semana</th><th>Nota</th><th>Ajuste</th><th>Bônus</th><th></th></tr>
               </thead>

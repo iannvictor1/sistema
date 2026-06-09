@@ -654,13 +654,18 @@ select:focus {
 table {
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: auto;
-  min-width: 860px;
+  table-layout: fixed;
+  min-width: 0;
   width: 100%;
 }
 
 .entries-table {
-  min-width: 1120px;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.history-table {
+  min-width: 0;
   table-layout: fixed;
 }
 
@@ -702,6 +707,46 @@ table {
 .entries-table th:nth-child(8),
 .entries-table td:nth-child(8) {
   width: 105px;
+}
+
+.history-table th:nth-child(1),
+.history-table td:nth-child(1) {
+  width: 68px;
+}
+
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) {
+  width: 30%;
+}
+
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) {
+  width: 100px;
+}
+
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) {
+  width: 165px;
+}
+
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) {
+  width: 72px;
+}
+
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) {
+  width: 23%;
+}
+
+.history-table th:nth-child(7),
+.history-table td:nth-child(7) {
+  width: 125px;
+}
+
+.history-table th:nth-child(8),
+.history-table td:nth-child(8) {
+  width: 118px;
 }
 
 .closing-table-wrap {
@@ -760,9 +805,10 @@ table {
 th,
 td {
   border-bottom: 1px solid #e7eef2;
+  overflow-wrap: break-word;
   padding: 13px 15px;
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 th {
@@ -771,8 +817,11 @@ th {
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
+  overflow: hidden;
   position: sticky;
+  text-overflow: ellipsis;
   top: 0;
+  white-space: nowrap;
   z-index: 1;
 }
 
@@ -784,6 +833,13 @@ td {
   color: var(--text);
 }
 
+td:first-child,
+.history-table td:nth-child(3),
+.history-table td:nth-child(4),
+.history-table td:nth-child(5) {
+  white-space: nowrap;
+}
+
 .adjustment-cell {
   max-width: 280px;
   overflow: hidden;
@@ -793,12 +849,13 @@ td {
 
 .bonus-cell {
   text-align: right;
+  white-space: nowrap;
 }
 
 .row-actions {
   text-align: right;
   white-space: nowrap;
-  width: 112px;
+  width: 118px;
 }
 
 .inline-edit-row:hover {
