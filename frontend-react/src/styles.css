@@ -1447,11 +1447,21 @@ td .icon-button + .icon-button {
 
   .table-wrap .row-actions {
     justify-items: start;
-    grid-template-columns: repeat(2, 40px);
+    align-items: center;
+    column-gap: 10px;
+    grid-template-columns: repeat(2, 44px) !important;
+    width: 100% !important;
   }
 
   .table-wrap .row-actions::before {
     grid-column: 1 / -1;
+  }
+
+  .table-wrap .row-actions .icon-button {
+    height: 44px;
+    margin-left: 0;
+    min-width: 44px;
+    width: 44px;
   }
 
   .closing-table-wrap {
