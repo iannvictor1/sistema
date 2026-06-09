@@ -762,8 +762,7 @@ td {
   border-bottom: 1px solid #e7eef2;
   padding: 13px 15px;
   text-align: left;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 th {
@@ -798,6 +797,8 @@ td {
 
 .row-actions {
   text-align: right;
+  white-space: nowrap;
+  width: 112px;
 }
 
 .inline-edit-row:hover {
@@ -878,6 +879,7 @@ td .icon-button + .icon-button {
   display: inline-flex;
   font-size: 12px;
   font-weight: 800;
+  white-space: nowrap;
   padding: 5px 10px;
 }
 
@@ -1172,8 +1174,10 @@ td .icon-button + .icon-button {
     gap: 14px;
     justify-content: space-between;
     min-height: 42px;
+    overflow-wrap: anywhere;
     padding: 10px 12px;
     text-align: right;
+    white-space: normal;
   }
 
   .table-wrap td[data-label]::before {
