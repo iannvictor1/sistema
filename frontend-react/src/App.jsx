@@ -578,7 +578,7 @@ function Employees({ employees, load }) {
       </div>
 
       <div className="table-wrap">
-        <table>
+        <table className="employees-table">
           <thead>
             <tr><th>ID</th><th>Nome</th><th>Cargo</th><th>Turno</th><th>Entrega</th><th>Status</th><th></th></tr>
           </thead>

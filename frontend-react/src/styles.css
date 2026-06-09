@@ -669,6 +669,46 @@ table {
   table-layout: fixed;
 }
 
+.employees-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.employees-table th:nth-child(1),
+.employees-table td:nth-child(1) {
+  width: 64px;
+}
+
+.employees-table th:nth-child(2),
+.employees-table td:nth-child(2) {
+  width: 35%;
+}
+
+.employees-table th:nth-child(3),
+.employees-table td:nth-child(3) {
+  width: 26%;
+}
+
+.employees-table th:nth-child(4),
+.employees-table td:nth-child(4) {
+  width: 120px;
+}
+
+.employees-table th:nth-child(5),
+.employees-table td:nth-child(5) {
+  width: 18%;
+}
+
+.employees-table th:nth-child(6),
+.employees-table td:nth-child(6) {
+  width: 92px;
+}
+
+.employees-table th:nth-child(7),
+.employees-table td:nth-child(7) {
+  width: 118px;
+}
+
 .entries-table th:nth-child(1),
 .entries-table td:nth-child(1) {
   width: 70px;
@@ -836,7 +876,10 @@ td {
 td:first-child,
 .history-table td:nth-child(3),
 .history-table td:nth-child(4),
-.history-table td:nth-child(5) {
+.history-table td:nth-child(5),
+.employees-table td:nth-child(4),
+.employees-table td:nth-child(6),
+.employees-table td:nth-child(7) {
   white-space: nowrap;
 }
 
