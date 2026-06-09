@@ -681,22 +681,22 @@ table {
 
 .employees-table th:nth-child(2),
 .employees-table td:nth-child(2) {
-  width: 35%;
+  width: 33%;
 }
 
 .employees-table th:nth-child(3),
 .employees-table td:nth-child(3) {
-  width: 26%;
+  width: 24%;
 }
 
 .employees-table th:nth-child(4),
 .employees-table td:nth-child(4) {
-  width: 120px;
+  width: 170px;
 }
 
 .employees-table th:nth-child(5),
 .employees-table td:nth-child(5) {
-  width: 18%;
+  width: 17%;
 }
 
 .employees-table th:nth-child(6),
