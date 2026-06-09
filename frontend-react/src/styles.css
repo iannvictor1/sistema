@@ -709,6 +709,51 @@ table {
   width: 118px;
 }
 
+.frequency-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.frequency-table th:nth-child(1),
+.frequency-table td:nth-child(1) {
+  width: 64px;
+}
+
+.frequency-table th:nth-child(2),
+.frequency-table td:nth-child(2) {
+  width: 34%;
+}
+
+.frequency-table th:nth-child(3),
+.frequency-table td:nth-child(3) {
+  width: 130px;
+}
+
+.frequency-table th:nth-child(4),
+.frequency-table td:nth-child(4) {
+  width: 140px;
+}
+
+.frequency-table th:nth-child(5),
+.frequency-table td:nth-child(5) {
+  width: 120px;
+}
+
+.frequency-table th:nth-child(6),
+.frequency-table td:nth-child(6) {
+  width: 150px;
+}
+
+.frequency-table th:nth-child(7),
+.frequency-table td:nth-child(7) {
+  width: 130px;
+}
+
+.frequency-table th:nth-child(8),
+.frequency-table td:nth-child(8) {
+  width: 118px;
+}
+
 .entries-table th:nth-child(1),
 .entries-table td:nth-child(1) {
   width: 70px;
@@ -879,7 +924,13 @@ td:first-child,
 .history-table td:nth-child(5),
 .employees-table td:nth-child(4),
 .employees-table td:nth-child(6),
-.employees-table td:nth-child(7) {
+.employees-table td:nth-child(7),
+.frequency-table td:nth-child(3),
+.frequency-table td:nth-child(4),
+.frequency-table td:nth-child(5),
+.frequency-table td:nth-child(6),
+.frequency-table td:nth-child(7),
+.frequency-table td:nth-child(8) {
   white-space: nowrap;
 }
 

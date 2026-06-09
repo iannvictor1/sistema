@@ -1640,7 +1640,7 @@ function Frequencies({ employees, frequencies, load }) {
       {message && <div className="alert">{message}</div>}
 
       <div className="table-wrap">
-        <table>
+        <table className="frequency-table">
           <thead>
             <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th></th></tr>
           </thead>
