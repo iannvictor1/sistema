@@ -1302,7 +1302,7 @@ td .icon-button + .icon-button {
   .table-wrap td {
     display: block;
     min-width: 0 !important;
-    width: 100%;
+    width: 100% !important;
   }
 
   .table-wrap thead {
@@ -1321,9 +1321,9 @@ td .icon-button + .icon-button {
   .table-wrap td[data-label] {
     align-items: center;
     border-bottom: 1px solid var(--line);
-    display: flex;
+    display: grid;
     gap: 14px;
-    justify-content: space-between;
+    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
     min-height: 42px;
     overflow-wrap: anywhere;
     padding: 10px 12px;
@@ -1334,7 +1334,6 @@ td .icon-button + .icon-button {
   .table-wrap td[data-label]::before {
     color: var(--muted-strong);
     content: attr(data-label);
-    flex: 0 0 min(42%, 150px);
     font-size: 12px;
     font-weight: 800;
     text-align: left;
@@ -1364,7 +1363,7 @@ td .icon-button + .icon-button {
   }
 
   .table-wrap .row-actions {
-    justify-content: flex-end;
+    justify-items: end;
   }
 
   .table-wrap td select,
@@ -1429,6 +1428,32 @@ td .icon-button + .icon-button {
     width: 100%;
   }
 
+  .table-wrap td[data-label] {
+    align-items: start;
+    gap: 6px;
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+    text-align: left;
+  }
+
+  .table-wrap td[data-label]::before {
+    line-height: 1.2;
+  }
+
+  .table-wrap .bonus-cell,
+  .table-wrap .row-actions {
+    text-align: left;
+  }
+
+  .table-wrap .row-actions {
+    justify-items: start;
+    grid-template-columns: repeat(2, 40px);
+  }
+
+  .table-wrap .row-actions::before {
+    grid-column: 1 / -1;
+  }
+
   .closing-table-wrap {
     background: transparent;
     border: 0;
@@ -1458,14 +1483,15 @@ td .icon-button + .icon-button {
   }
 
   .closing-table td {
-    align-items: center;
+    align-items: start;
     border-bottom: 1px solid var(--line);
-    display: flex;
-    gap: 14px;
-    justify-content: space-between;
+    display: grid;
+    gap: 6px;
+    grid-template-columns: 1fr;
     min-height: 42px;
     padding: 10px 12px;
-    text-align: right !important;
+    text-align: left !important;
+    width: 100% !important;
   }
 
   .closing-table td:last-child {
@@ -1475,7 +1501,6 @@ td .icon-button + .icon-button {
   .closing-table td::before {
     color: var(--muted-strong);
     content: attr(data-label);
-    flex: 0 0 auto;
     font-size: 12px;
     font-weight: 800;
     text-align: left;
