@@ -60,6 +60,7 @@ html {
 body {
   margin: 0;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 button,
@@ -214,6 +215,7 @@ nav button:not(.active):hover {
 .view {
   display: grid;
   gap: 20px;
+  min-width: 0;
 }
 
 .panel,
@@ -228,6 +230,7 @@ nav button:not(.active):hover {
 
 .panel {
   padding: 22px;
+  min-width: 0;
 }
 
 .panel h2,
@@ -644,6 +647,8 @@ select:focus {
 
 .table-wrap {
   overflow: auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 table {
@@ -757,7 +762,8 @@ td {
   border-bottom: 1px solid #e7eef2;
   padding: 13px 15px;
   text-align: left;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 th {
@@ -1126,6 +1132,108 @@ td .icon-button + .icon-button {
 
   .closing-table .badge {
     padding-inline: 8px;
+  }
+}
+
+@media (max-width: 900px) {
+  .table-wrap {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .table-wrap table,
+  .table-wrap tbody,
+  .table-wrap tr,
+  .table-wrap td {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .table-wrap thead {
+    display: none;
+  }
+
+  .table-wrap tr {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow-soft);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+
+  .table-wrap td[data-label] {
+    align-items: center;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+    min-height: 42px;
+    padding: 10px 12px;
+    text-align: right;
+  }
+
+  .table-wrap td[data-label]::before {
+    color: var(--muted-strong);
+    content: attr(data-label);
+    flex: 0 0 min(42%, 150px);
+    font-size: 12px;
+    font-weight: 800;
+    text-align: left;
+  }
+
+  .table-wrap td[data-label]:last-child {
+    border-bottom: 0;
+  }
+
+  .table-wrap td[data-label]:nth-child(2),
+  .table-wrap td[data-label].adjustment-cell {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+    text-align: left;
+  }
+
+  .table-wrap td[data-label].adjustment-cell {
+    max-width: none;
+    overflow: visible;
+    text-overflow: initial;
+    white-space: normal;
+  }
+
+  .table-wrap .bonus-cell {
+    text-align: right;
+  }
+
+  .table-wrap .row-actions {
+    justify-content: flex-end;
+  }
+
+  .table-wrap td select,
+  .table-wrap td input {
+    max-width: min(100%, 240px);
+  }
+
+  .table-wrap .inline-edit-row {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    margin-top: -4px;
+    overflow: visible;
+  }
+
+  .table-wrap .inline-edit-row > td {
+    background: transparent;
+    border-bottom: 0;
+    display: block;
+    padding: 0;
+  }
+
+  .table-wrap .inline-edit-row > td::before {
+    content: none;
   }
 }
 

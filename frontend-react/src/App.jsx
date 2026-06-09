@@ -586,13 +586,13 @@ function Employees({ employees, load }) {
             {filtered.map((employee) => (
               <Fragment key={employee.id}>
                 <tr>
-                  <td>{employee.id}</td>
-                  <td>{employee.nome}</td>
-                  <td>{employee.cargo}</td>
-                  <td>{employee.turno}</td>
-                  <td>{employee.tipo_entrega}</td>
-                  <td><span className={employee.ativo ? "badge ok" : "badge muted"}>{employee.ativo ? "Ativo" : "Inativo"}</span></td>
-                  <td>
+                  <td data-label="ID">{employee.id}</td>
+                  <td data-label="Nome">{employee.nome}</td>
+                  <td data-label="Cargo">{employee.cargo}</td>
+                  <td data-label="Turno">{employee.turno}</td>
+                  <td data-label="Entrega">{employee.tipo_entrega}</td>
+                  <td data-label="Status"><span className={employee.ativo ? "badge ok" : "badge muted"}>{employee.ativo ? "Ativo" : "Inativo"}</span></td>
+                  <td className="row-actions" data-label="Ações">
                     <button
                       className="icon-button"
                       onClick={() => startEditing(employee)}
@@ -1306,10 +1306,10 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
               <tbody>
                 {monthlyEmployees.map((employee) => (
                   <tr key={employee.id}>
-                    <td>{employee.nome}</td>
-                    <td>{employee.cargo}</td>
-                    <td>{employee.turno}</td>
-                    <td>
+                    <td data-label="Funcionário">{employee.nome}</td>
+                    <td data-label="Cargo">{employee.cargo}</td>
+                    <td data-label="Turno">{employee.turno}</td>
+                    <td data-label="Nota">
                       <select
                         value={monthlyForm.notas[employee.id] || 5}
                         onChange={(event) =>
@@ -1429,16 +1429,16 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                 {filteredEntries.map((entry) => (
                   <Fragment key={entry.id}>
                     <tr>
-                      <td>{entry.id}</td>
-                      <td>{employeeMap[entry.funcionario_id]?.nome || `#${entry.funcionario_id}`}</td>
-                      <td>{entry.tipo_lancamento}</td>
-                      <td>{entry.semana}</td>
-                      <td>{entry.nota}</td>
-                      <td className="adjustment-cell" title={customAdjustmentSummary(entry)}>
+                      <td data-label="ID">{entry.id}</td>
+                      <td data-label="Funcionário">{employeeMap[entry.funcionario_id]?.nome || `#${entry.funcionario_id}`}</td>
+                      <td data-label="Tipo">{entry.tipo_lancamento}</td>
+                      <td data-label="Semana">{entry.semana}</td>
+                      <td data-label="Nota">{entry.nota}</td>
+                      <td className="adjustment-cell" data-label="Ajuste" title={customAdjustmentSummary(entry)}>
                         {customAdjustmentSummary(entry)}
                       </td>
-                      <td className="bonus-cell">{currency.format(Number(entry.bonus_calculado || 0))}</td>
-                      <td className="row-actions">
+                      <td className="bonus-cell" data-label="Bônus">{currency.format(Number(entry.bonus_calculado || 0))}</td>
+                      <td className="row-actions" data-label="Ações">
                         <button 
                           className="icon-button"
                           onClick={() => setEditingEntry({
@@ -1648,14 +1648,14 @@ function Frequencies({ employees, frequencies, load }) {
             {frequencies.map((frequency) => (
               <Fragment key={frequency.id}>
                 <tr>
-                  <td>{frequency.id}</td>
-                  <td>{employeeMap[frequency.funcionario_id]?.nome || `#${frequency.funcionario_id}`}</td>
-                  <td>{frequency.mes}</td>
-                  <td>{frequency.status_mes}</td>
-                  <td>{frequency.ausencias}</td>
-                  <td>{frequency.data_falta || "-"}</td>
-                  <td>{frequency.tipo_falta || "-"}</td>
-                  <td>
+                  <td data-label="ID">{frequency.id}</td>
+                  <td data-label="Funcionário">{employeeMap[frequency.funcionario_id]?.nome || `#${frequency.funcionario_id}`}</td>
+                  <td data-label="Mês">{frequency.mes}</td>
+                  <td data-label="Status">{frequency.status_mes}</td>
+                  <td data-label="Ausências">{frequency.ausencias}</td>
+                  <td data-label="Dia">{frequency.data_falta || "-"}</td>
+                  <td data-label="Tipo">{frequency.tipo_falta || "-"}</td>
+                  <td className="row-actions" data-label="Ações">
                     <button
                       className="icon-button"
                       onClick={() => startEditFrequency(frequency)}
