@@ -1040,13 +1040,8 @@ td .icon-button + .icon-button {
 }
 
 .badge.muted {
-  background: #e9eef2;
-  color: var(--muted-strong);
-}
-
-:root[data-theme="dark"] .badge.muted {
-  background: #343740;
-  color: #eef2f8;
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .badge.danger {
