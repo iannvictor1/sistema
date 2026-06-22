@@ -1044,6 +1044,11 @@ td .icon-button + .icon-button {
   color: var(--muted-strong);
 }
 
+:root[data-theme="dark"] .badge.muted {
+  background: #343740;
+  color: #eef2f8;
+}
+
 .badge.danger {
   background: var(--danger-soft);
   color: var(--danger);
