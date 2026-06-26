@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from .database import Base, engine, SessionLocal
-from .models import Funcionario, LancamentoSemanal, FrequenciaMensal
+from .models import Funcionario, LancamentoSemanal, FrequenciaMensal, DescontoFechamento
 from .schemas import (
     FuncionarioCreate,
     FuncionarioResponse,
@@ -15,7 +15,9 @@ from .schemas import (
     LancamentoSemanalResponse,
     FrequenciaMensalCreate,
     FrequenciaMensalResponse,
-    LancamentoSemanalUpdate
+    LancamentoSemanalUpdate,
+    DescontoFechamentoCreate,
+    DescontoFechamentoResponse
 )
 from .calculos import calcular_bonus, calcular_bonus_mensal
 from .export_excel import exportar_fechamento_excel
@@ -170,6 +172,22 @@ def nota_atual_lancamentos(lancamentos: list[LancamentoSemanal]) -> int | None:
     return lancamento_atual.nota
 
 
+def desconto_por_funcionario(db: Session, mes: str) -> dict[int, DescontoFechamento]:
+    descontos = (
+        db.query(DescontoFechamento)
+        .filter(DescontoFechamento.mes == mes)
+        .all()
+    )
+    return {desconto.funcionario_id: desconto for desconto in descontos}
+
+
+def aplicar_desconto_fechamento(bonus_bruto: float, desconto: DescontoFechamento | None) -> tuple[float, float, str | None]:
+    valor_desconto = max(0.0, float(getattr(desconto, "valor", 0) or 0))
+    motivo_desconto = getattr(desconto, "motivo", None) if desconto else None
+    bonus_final = max(0.0, round(float(bonus_bruto or 0) - valor_desconto, 2))
+    return bonus_final, valor_desconto, motivo_desconto
+
+
 def normalizar_texto(valor: str) -> str:
     texto = (valor or "").strip().lower()
     return "".join(
@@ -312,6 +330,11 @@ def excluir_funcionario(
         .filter(FrequenciaMensal.funcionario_id == funcionario_id)
         .delete()
     )
+    total_descontos = (
+        db.query(DescontoFechamento)
+        .filter(DescontoFechamento.funcionario_id == funcionario_id)
+        .delete()
+    )
 
     db.delete(funcionario)
     db.commit()
@@ -319,7 +342,8 @@ def excluir_funcionario(
     return {
         "mensagem": "Funcionário excluído com sucesso.",
         "lancamentos_excluidos": total_lancamentos,
-        "frequencias_excluidas": total_frequencias
+        "frequencias_excluidas": total_frequencias,
+        "descontos_excluidos": total_descontos
     }
 
 
@@ -694,11 +718,84 @@ def excluir_frequencia(
     return {"mensagem": "Frequência excluída com sucesso."}
 
 
+@app.post("/descontos-fechamento", response_model=DescontoFechamentoResponse)
+def salvar_desconto_fechamento(
+    desconto: DescontoFechamentoCreate,
+    db: Session = Depends(get_db)
+):
+    funcionario = (
+        db.query(Funcionario)
+        .filter(Funcionario.id == desconto.funcionario_id)
+        .first()
+    )
+
+    if not funcionario:
+        raise HTTPException(status_code=404, detail="Funcionario nao encontrado.")
+
+    if len(desconto.mes or "") != 7:
+        raise HTTPException(status_code=400, detail="Informe o mes no formato AAAA-MM.")
+
+    if desconto.valor < 0:
+        raise HTTPException(status_code=400, detail="O desconto nao pode ser negativo.")
+
+    existente = (
+        db.query(DescontoFechamento)
+        .filter(
+            DescontoFechamento.funcionario_id == desconto.funcionario_id,
+            DescontoFechamento.mes == desconto.mes
+        )
+        .first()
+    )
+    motivo = (desconto.motivo or "").strip() or None
+
+    if existente:
+        existente.valor = desconto.valor
+        existente.motivo = motivo
+        db.commit()
+        db.refresh(existente)
+        return existente
+
+    novo = DescontoFechamento(
+        funcionario_id=desconto.funcionario_id,
+        mes=desconto.mes,
+        valor=desconto.valor,
+        motivo=motivo
+    )
+    db.add(novo)
+    db.commit()
+    db.refresh(novo)
+    return novo
+
+
+@app.delete("/descontos-fechamento/{mes}/{funcionario_id}")
+def excluir_desconto_fechamento(
+    mes: str,
+    funcionario_id: int,
+    db: Session = Depends(get_db)
+):
+    desconto = (
+        db.query(DescontoFechamento)
+        .filter(
+            DescontoFechamento.funcionario_id == funcionario_id,
+            DescontoFechamento.mes == mes
+        )
+        .first()
+    )
+
+    if not desconto:
+        return {"mensagem": "Nenhum desconto cadastrado para remover."}
+
+    db.delete(desconto)
+    db.commit()
+    return {"mensagem": "Desconto removido."}
+
+
 @app.get("/fechamento/{mes}")
 def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
     funcionarios = db.query(Funcionario).order_by(Funcionario.nome).all()
     resultado = []
     mes_formatado = formatar_mes_para_semana(mes)
+    descontos_mapa = desconto_por_funcionario(db, mes)
 
     for funcionario in funcionarios:
         frequencias = (
@@ -724,15 +821,20 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
 
         if status_mes == "Férias":
             nota_atual = nota_atual_lancamentos(lancamentos)
-            bonus_final = 0.0
+            bonus_bruto = 0.0
             assiduidade = 0.0
             elegivel = True
             ausencias = 0
         else:
             nota_atual = nota_atual_lancamentos(lancamentos)
-            bonus_final = calcular_bonus_mensal(lancamentos, ausencias, nota_atual, funcionario)
+            bonus_bruto = calcular_bonus_mensal(lancamentos, ausencias, nota_atual, funcionario)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
+
+        bonus_final, desconto, motivo_desconto = aplicar_desconto_fechamento(
+            bonus_bruto,
+            descontos_mapa.get(funcionario.id)
+        )
 
         resultado.append({
             "funcionario_id": funcionario.id,
@@ -742,6 +844,9 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             "ausencias": ausencias,
             "quantidade_lancamentos": len(lancamentos),
             "nota_atual": nota_atual,
+            "bonus_bruto": bonus_bruto,
+            "desconto": desconto,
+            "motivo_desconto": motivo_desconto,
             "bonus_final": bonus_final,
             "assiduidade": assiduidade,
             "elegivel": elegivel,
@@ -755,6 +860,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
 def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
     funcionarios = db.query(Funcionario).order_by(Funcionario.nome).all()
     mes_formatado = formatar_mes_para_semana(mes)
+    descontos_mapa = desconto_por_funcionario(db, mes)
 
     fechamento = []
     for funcionario in funcionarios:
@@ -781,16 +887,21 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
         nota_atual = nota_atual_lancamentos(lancamentos_mes)
 
         if status_mes == "Férias":
-            bonus_final = 0.0
+            bonus_bruto = 0.0
             assiduidade = 0.0
             elegivel = True
             ausencias = 0
         
         else:
             nota_atual = nota_atual_lancamentos(lancamentos_mes)
-            bonus_final = calcular_bonus_mensal(lancamentos_mes, ausencias, nota_atual, funcionario)
+            bonus_bruto = calcular_bonus_mensal(lancamentos_mes, ausencias, nota_atual, funcionario)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
+
+        bonus_final, desconto, motivo_desconto = aplicar_desconto_fechamento(
+            bonus_bruto,
+            descontos_mapa.get(funcionario.id)
+        )
 
         fechamento.append({
             "funcionario_id": funcionario.id,
@@ -800,6 +911,9 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
             "ausencias": ausencias,
             "quantidade_lancamentos": len(lancamentos_mes),
             "nota_atual": nota_atual,
+            "bonus_bruto": bonus_bruto,
+            "desconto": desconto,
+            "motivo_desconto": motivo_desconto,
             "bonus_final": bonus_final,
             "assiduidade": assiduidade,
             "elegivel": elegivel,

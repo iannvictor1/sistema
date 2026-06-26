@@ -124,3 +124,21 @@ class FrequenciaMensalResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DescontoFechamentoCreate(BaseModel):
+    funcionario_id: int
+    mes: str
+    valor: float
+    motivo: str | None = None
+
+
+class DescontoFechamentoResponse(BaseModel):
+    id: int
+    funcionario_id: int
+    mes: str
+    valor: float
+    motivo: str | None = None
+
+    class Config:
+        from_attributes = True

@@ -2,6 +2,7 @@
   BarChart3,
   CalendarCheck,
   ChevronDown,
+  CircleMinus,
   Clock,
   FileSpreadsheet,
   History,
@@ -1695,6 +1696,7 @@ function Closing() {
   const [selectedMonth, setSelectedMonth] = useState(month);
   const [closing, setClosing] = useState([]);
   const [message, setMessage] = useState("");
+  const [editingDiscount, setEditingDiscount] = useState(null);
 
   async function calculate() {
     setMessage("");
@@ -1703,6 +1705,7 @@ function Closing() {
     try {
       const data = await api.get(`/fechamento/${selectedMonth}`);
       setClosing(Array.isArray(data) ? data : []);
+      setEditingDiscount(null);
     } catch (err) {
       setMessage(errorMessage(err));
     }
@@ -1712,6 +1715,47 @@ function Closing() {
     setMonth(value);
     if (isValidMonthInput(value)) {
       setSelectedMonth(value);
+    }
+  }
+
+  function startDiscount(item) {
+    setMessage("");
+    setEditingDiscount({
+      funcionario_id: item.funcionario_id,
+      funcionario: item.funcionario,
+      valor: Number(item.desconto || 0) || "",
+      motivo: item.motivo_desconto || "",
+    });
+  }
+
+  async function saveDiscount(event) {
+    event.preventDefault();
+    setMessage("");
+
+    try {
+      await api.post("/descontos-fechamento", {
+        funcionario_id: editingDiscount.funcionario_id,
+        mes: selectedMonth,
+        valor: Number(editingDiscount.valor || 0),
+        motivo: editingDiscount.motivo,
+      });
+      await calculate();
+      setMessage("Desconto aplicado.");
+    } catch (err) {
+      setMessage(errorMessage(err));
+    }
+  }
+
+  async function removeDiscount() {
+    if (!editingDiscount) return;
+    setMessage("");
+
+    try {
+      await api.delete(`/descontos-fechamento/${selectedMonth}/${editingDiscount.funcionario_id}`);
+      await calculate();
+      setMessage("Desconto removido.");
+    } catch (err) {
+      setMessage(errorMessage(err));
     }
   }
 
@@ -1737,20 +1781,73 @@ function Closing() {
       <div className="table-wrap closing-table-wrap">
         <table className="closing-table">
           <thead>
-            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Nota atual</th><th>Ausências</th><th>Lançamentos</th><th>Assiduidade</th><th>Bônus final</th></tr>
+            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Nota atual</th><th>Ausências</th><th>Lançamentos</th><th>Assiduidade</th><th>Desconto</th><th>Bônus final</th><th></th></tr>
           </thead>
           <tbody>
             {closing.map((item) => (
-              <tr key={item.funcionario_id}>
-                <td data-label="Funcionário">{item.funcionario}</td>
-                <td data-label="Cargo">{item.cargo}</td>
-                <td data-label="Status"><span className={item.elegivel ? "badge ok" : "badge danger"}>{item.status_mes === "Férias" ? "Férias" : item.elegivel ? "Elegível" : "Bloqueado"}</span></td>
-                <td data-label="Nota atual">{item.nota_atual ?? "-"}</td>
-                <td data-label="Ausências">{item.ausencias}</td>
-                <td data-label="Lançamentos">{item.quantidade_lancamentos}</td>
-                <td data-label="Assiduidade">{currency.format(Number(item.assiduidade || 0))}</td>
-                <td data-label="Bônus final"><strong>{currency.format(Number(item.bonus_final || 0))}</strong></td>
-              </tr>
+              <Fragment key={item.funcionario_id}>
+                <tr>
+                  <td data-label="Funcionário">{item.funcionario}</td>
+                  <td data-label="Cargo">{item.cargo}</td>
+                  <td data-label="Status"><span className={item.elegivel ? "badge ok" : "badge danger"}>{item.status_mes === "Férias" ? "Férias" : item.elegivel ? "Elegível" : "Bloqueado"}</span></td>
+                  <td data-label="Nota atual">{item.nota_atual ?? "-"}</td>
+                  <td data-label="Ausências">{item.ausencias}</td>
+                  <td data-label="Lançamentos">{item.quantidade_lancamentos}</td>
+                  <td data-label="Assiduidade">{currency.format(Number(item.assiduidade || 0))}</td>
+                  <td data-label="Desconto" title={item.motivo_desconto || ""}>{currency.format(Number(item.desconto || 0))}</td>
+                  <td data-label="Bônus final">
+                    <strong>{currency.format(Number(item.bonus_final || 0))}</strong>
+                    {Number(item.desconto || 0) > 0 && (
+                      <small className="bonus-before-discount">
+                        de {currency.format(Number(item.bonus_bruto || 0))}
+                      </small>
+                    )}
+                  </td>
+                  <td className="row-actions" data-label="Ações">
+                    <button
+                      className="icon-button"
+                      onClick={() => startDiscount(item)}
+                      title="Aplicar desconto"
+                      type="button"
+                    >
+                      <CircleMinus size={16} />
+                    </button>
+                  </td>
+                </tr>
+
+                {editingDiscount?.funcionario_id === item.funcionario_id && (
+                  <tr className="inline-edit-row">
+                    <td colSpan="10">
+                      <form className="inline-edit-form discount-form" onSubmit={saveDiscount}>
+                        <h2>Desconto de {editingDiscount.funcionario}</h2>
+                        <label>
+                          Valor
+                          <input
+                            min="0"
+                            step="0.01"
+                            type="number"
+                            value={editingDiscount.valor}
+                            onChange={(event) => setEditingDiscount({ ...editingDiscount, valor: event.target.value })}
+                          />
+                        </label>
+                        <label>
+                          Motivo
+                          <input
+                            placeholder="Opcional"
+                            value={editingDiscount.motivo}
+                            onChange={(event) => setEditingDiscount({ ...editingDiscount, motivo: event.target.value })}
+                          />
+                        </label>
+                        <button className="primary" type="submit"><Save size={17} /> Salvar desconto</button>
+                        <button className="icon-button danger" onClick={removeDiscount} title="Remover desconto" type="button">
+                          <Trash2 size={16} />
+                        </button>
+                        <button className="icon-button" onClick={() => setEditingDiscount(null)} type="button">X</button>
+                      </form>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

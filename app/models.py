@@ -49,3 +49,13 @@ class FrequenciaMensal(Base):
     data_falta = Column(Date, nullable=True)
     tipo_falta = Column(String, nullable=True)
     status_mes = Column(String, default="Normal")  
+
+
+class DescontoFechamento(Base):
+    __tablename__ = "descontos_fechamento"
+
+    id = Column(Integer, primary_key=True, index=True)
+    funcionario_id = Column(Integer, ForeignKey("funcionarios.id"), nullable=False)
+    mes = Column(String, nullable=False)
+    valor = Column(Float, default=0)
+    motivo = Column(String, nullable=True)
