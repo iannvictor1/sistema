@@ -112,6 +112,9 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     total_bloqueados = 0
 
     for item in fechamento:
+        bonus_com_assiduidade = float(item.get("bonus_bruto", item["bonus_final"]) or 0)
+        assiduidade = float(item.get("assiduidade", 0) or 0)
+        bonus_lancamentos = round(max(0.0, bonus_com_assiduidade - assiduidade), 2)
         elegivel = "Sim" if item["elegivel"] else "Não"
 
         ws_resumo.cell(linha_atual, 1, item["funcionario_id"])
@@ -123,7 +126,7 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_resumo.cell(linha_atual, 7, elegivel)
         ws_resumo.cell(linha_atual, 8, item["assiduidade"])
         ws_resumo.cell(linha_atual, 9, item.get("nota_atual") or "-")
-        ws_resumo.cell(linha_atual, 10, item.get("bonus_bruto", item["bonus_final"]))
+        ws_resumo.cell(linha_atual, 10, bonus_lancamentos)
         ws_resumo.cell(linha_atual, 11, item.get("desconto", 0))
         ws_resumo.cell(linha_atual, 12, item.get("motivo_desconto") or "-")
         ws_resumo.cell(linha_atual, 13, item["bonus_final"])
