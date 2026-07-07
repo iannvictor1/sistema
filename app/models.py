@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Date
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Date, Text
 from .database import Base
 
 class Funcionario(Base):
@@ -27,6 +27,9 @@ class LancamentoSemanal(Base):
     pedidos_separados = Column(Integer, default=0)
     pedidos_carregados = Column(Integer, default=0)
     toneladas = Column(Float, default=0)
+    numero_nota_fiscal = Column(String, nullable=True)
+    nota_fiscal_pdf = Column(Text, nullable=True)
+    nota_fiscal_pdf_nome = Column(String, nullable=True)
     entregas = Column(Integer, default=0)
     retornos = Column(Integer, default=0)
     nota = Column(Integer, default=3)
@@ -37,6 +40,10 @@ class LancamentoSemanal(Base):
     ajuste_personalizado_valor = Column(Float, default=0)
     ajuste_personalizado_itens = Column(String, nullable=True)
     bonus_calculado = Column(Float, default=0)
+
+    @property
+    def nota_fiscal_pdf_disponivel(self):
+        return bool(self.nota_fiscal_pdf)
 
 
 class FrequenciaMensal(Base):

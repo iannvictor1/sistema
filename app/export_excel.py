@@ -4,7 +4,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 
-def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, funcionarios):
+def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, funcionarios, base_url: str = ""):
     wb = Workbook()
 
     ws = wb.active
@@ -187,7 +187,7 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     # Aba 2 - Lançamentos Semanais
     # =========================
     ws_lanc = wb.create_sheet("Lançamentos Semanais")
-    ws_lanc.merge_cells("A1:Q1")
+    ws_lanc.merge_cells("A1:S1")
     ws_lanc["A1"] = "Detalhamento dos Lançamentos Semanais"
     ws_lanc["A1"].font = fonte_titulo
     ws_lanc["A1"].fill = fill_titulo
@@ -205,6 +205,8 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         "Pedidos Separados",
         "Pedidos Carregados",
         "Toneladas",
+        "N\u00famero da Nota Fiscal",
+        "PDF da Nota Fiscal",
         "Entregas",
         "Retornos",
         "Nota",
@@ -236,27 +238,35 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_lanc.cell(linha, 9, l.pedidos_separados)
         ws_lanc.cell(linha, 10, l.pedidos_carregados)
         ws_lanc.cell(linha, 11, l.toneladas)
-        ws_lanc.cell(linha, 12, l.entregas)
-        ws_lanc.cell(linha, 13, l.retornos)
-        ws_lanc.cell(linha, 14, l.nota)
-        ws_lanc.cell(linha, 15, "Sim" if l.penalidade else "Não")
-        ws_lanc.cell(linha, 16, l.motivo_penalidade if l.motivo_penalidade else "-")
-        ws_lanc.cell(linha, 17, l.bonus_calculado)
+        ws_lanc.cell(linha, 12, getattr(l, "numero_nota_fiscal", None) or "-")
+        if getattr(l, "nota_fiscal_pdf", None):
+            celula_pdf = ws_lanc.cell(linha, 13, "Abrir PDF")
+            if base_url:
+                celula_pdf.hyperlink = f"{base_url}/lancamentos-semanais/{l.id}/nota-fiscal"
+                celula_pdf.style = "Hyperlink"
+        else:
+            ws_lanc.cell(linha, 13, "-")
+        ws_lanc.cell(linha, 14, l.entregas)
+        ws_lanc.cell(linha, 15, l.retornos)
+        ws_lanc.cell(linha, 16, l.nota)
+        ws_lanc.cell(linha, 17, "Sim" if l.penalidade else "Não")
+        ws_lanc.cell(linha, 18, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_lanc.cell(linha, 19, l.bonus_calculado)
 
-        for col in range(1, 18):
+        for col in range(1, 20):
             ws_lanc.cell(linha, col).border = borda_fina
 
-        formatar_moeda(ws_lanc.cell(linha, 17))
+        formatar_moeda(ws_lanc.cell(linha, 19))
         linha += 1
 
     ws_lanc.freeze_panes = "A4"
-    ws_lanc.auto_filter.ref = f"A3:Q{max(linha - 1, 3)}"
+    ws_lanc.auto_filter.ref = f"A3:S{max(linha - 1, 3)}"
 
     # =========================
     # Aba 3 - Lançamentos Diários
     # =========================
     ws_diario = wb.create_sheet("Lançamentos Diários")
-    ws_diario.merge_cells("A1:Q1")
+    ws_diario.merge_cells("A1:S1")
     ws_diario["A1"] = "Detalhamento dos Lançamentos Diários"
     ws_diario["A1"].font = fonte_titulo
     ws_diario["A1"].fill = fill_titulo
@@ -285,21 +295,29 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_diario.cell(linha, 9, l.pedidos_separados)
         ws_diario.cell(linha, 10, l.pedidos_carregados)
         ws_diario.cell(linha, 11, l.toneladas)
-        ws_diario.cell(linha, 12, l.entregas)
-        ws_diario.cell(linha, 13, l.retornos)
-        ws_diario.cell(linha, 14, l.nota)
-        ws_diario.cell(linha, 15, "Sim" if l.penalidade else "Não")
-        ws_diario.cell(linha, 16, l.motivo_penalidade if l.motivo_penalidade else "-")
-        ws_diario.cell(linha, 17, l.bonus_calculado)
+        ws_diario.cell(linha, 12, getattr(l, "numero_nota_fiscal", None) or "-")
+        if getattr(l, "nota_fiscal_pdf", None):
+            celula_pdf = ws_diario.cell(linha, 13, "Abrir PDF")
+            if base_url:
+                celula_pdf.hyperlink = f"{base_url}/lancamentos-semanais/{l.id}/nota-fiscal"
+                celula_pdf.style = "Hyperlink"
+        else:
+            ws_diario.cell(linha, 13, "-")
+        ws_diario.cell(linha, 14, l.entregas)
+        ws_diario.cell(linha, 15, l.retornos)
+        ws_diario.cell(linha, 16, l.nota)
+        ws_diario.cell(linha, 17, "Sim" if l.penalidade else "Não")
+        ws_diario.cell(linha, 18, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_diario.cell(linha, 19, l.bonus_calculado)
 
-        for col in range(1, 18):
+        for col in range(1, 20):
             ws_diario.cell(linha, col).border = borda_fina
 
-        formatar_moeda(ws_diario.cell(linha, 17))
+        formatar_moeda(ws_diario.cell(linha, 19))
         linha += 1
 
     ws_diario.freeze_panes = "A4"
-    ws_diario.auto_filter.ref = f"A3:Q{max(linha - 1, 3)}"
+    ws_diario.auto_filter.ref = f"A3:S{max(linha - 1, 3)}"
 
     # =========================
     # Aba 4 - Frequência Mensal (RESTAURADA)

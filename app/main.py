@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -25,6 +25,8 @@ from datetime import date
 from pathlib import Path
 import json
 import unicodedata
+import base64
+import binascii
 
 app = FastAPI(title="Sistema de Bonificação")
 
@@ -93,6 +95,9 @@ def garantir_colunas_lancamento():
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_operacao TEXT"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_valor DOUBLE PRECISION DEFAULT 0"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_itens TEXT"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS numero_nota_fiscal TEXT"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS nota_fiscal_pdf TEXT"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS nota_fiscal_pdf_nome TEXT"))
             return
 
         if engine.dialect.name != "sqlite":
@@ -111,6 +116,12 @@ def garantir_colunas_lancamento():
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_valor REAL DEFAULT 0"))
         if "ajuste_personalizado_itens" not in colunas:
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_itens TEXT"))
+        if "numero_nota_fiscal" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN numero_nota_fiscal TEXT"))
+        if "nota_fiscal_pdf" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN nota_fiscal_pdf TEXT"))
+        if "nota_fiscal_pdf_nome" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN nota_fiscal_pdf_nome TEXT"))
 
 
 garantir_colunas_lancamento()
@@ -132,6 +143,26 @@ def carregar_ajustes_personalizados(itens: str | None, criterio: str | None = No
         return [{"criterio": criterio, "operacao": operacao}]
 
     return []
+
+
+LIMITE_PDF_NOTA_FISCAL = 10 * 1024 * 1024
+
+
+def validar_pdf_nota_fiscal(pdf_base64: str | None) -> str | None:
+    if not pdf_base64:
+        return None
+
+    try:
+        conteudo = base64.b64decode(pdf_base64, validate=True)
+    except (ValueError, binascii.Error):
+        raise HTTPException(status_code=400, detail="O arquivo da nota fiscal estÃ¡ invÃ¡lido.")
+
+    if len(conteudo) > LIMITE_PDF_NOTA_FISCAL:
+        raise HTTPException(status_code=400, detail="O PDF da nota fiscal deve ter no mÃ¡ximo 10 MB.")
+    if not conteudo.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="O anexo da nota fiscal deve ser um arquivo PDF.")
+
+    return pdf_base64
 
 
 def formatar_mes_para_semana(mes: str) -> str:
@@ -208,6 +239,18 @@ def funcionario_aplicavel_tipo(funcionario: Funcionario, tipo_funcionario: str) 
     if normalizar_texto(tipo_funcionario) == "entrega":
         return tipo_entrega in {"entrega", "motorista", "ajudante", "ajudante de motorista"}
     return tipo_entrega == normalizar_texto(tipo_funcionario)
+
+
+def funcionario_recebe_toneladas(funcionario: Funcionario, itens: str | None, criterio: str | None, operacao: str | None) -> bool:
+    ajustes = carregar_ajustes_personalizados(itens, criterio, operacao)
+    if any(item.get("criterio") == "toneladas" and item.get("operacao") == "retirar" for item in ajustes):
+        return False
+    if any(item.get("criterio") == "toneladas" and item.get("operacao") == "adicionar" for item in ajustes):
+        return True
+
+    tipo_entrega = normalizar_texto(funcionario.tipo_entrega)
+    funcionario_entrega = tipo_entrega in {"entrega", "motorista", "ajudante", "ajudante de motorista"}
+    return not funcionario_entrega and normalizar_texto(funcionario.turno) == "manha"
 
 
 def get_db():
@@ -362,6 +405,14 @@ def criar_lancamento_semanal(
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
 
+    if funcionario_recebe_toneladas(
+        funcionario,
+        lancamento.ajuste_personalizado_itens,
+        lancamento.ajuste_personalizado_descricao,
+        lancamento.ajuste_personalizado_operacao,
+    ) and not (lancamento.numero_nota_fiscal or "").strip():
+        raise HTTPException(status_code=400, detail="Informe o nÃºmero da nota fiscal.")
+
     if lancamento.penalidade and not lancamento.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
 
@@ -399,6 +450,9 @@ def criar_lancamento_semanal(
         pedidos_separados=lancamento.pedidos_separados,
         pedidos_carregados=lancamento.pedidos_carregados,
         toneladas=lancamento.toneladas,
+        numero_nota_fiscal=(lancamento.numero_nota_fiscal or "").strip() or None,
+        nota_fiscal_pdf=validar_pdf_nota_fiscal(lancamento.nota_fiscal_pdf),
+        nota_fiscal_pdf_nome=(lancamento.nota_fiscal_pdf_nome or "").strip() or None,
         entregas=lancamento.entregas,
         retornos=lancamento.retornos,
         nota=lancamento.nota,
@@ -420,6 +474,24 @@ def criar_lancamento_semanal(
 @app.get("/lancamentos-semanais", response_model=list[LancamentoSemanalResponse])
 def listar_lancamentos_semanais(db: Session = Depends(get_db)):
     return db.query(LancamentoSemanal).order_by(LancamentoSemanal.id.desc()).all()
+
+
+@app.get("/lancamentos-semanais/{lancamento_id}/nota-fiscal")
+def baixar_nota_fiscal(lancamento_id: int, db: Session = Depends(get_db)):
+    lancamento = db.query(LancamentoSemanal).filter(LancamentoSemanal.id == lancamento_id).first()
+    if not lancamento or not lancamento.nota_fiscal_pdf:
+        raise HTTPException(status_code=404, detail="Nota fiscal nÃ£o encontrada.")
+
+    try:
+        conteudo = base64.b64decode(lancamento.nota_fiscal_pdf, validate=True)
+    except (ValueError, binascii.Error):
+        raise HTTPException(status_code=500, detail="O PDF armazenado estÃ¡ invÃ¡lido.")
+
+    return Response(
+        content=conteudo,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="nota-fiscal-{lancamento.id}.pdf"'},
+    )
 
 
 @app.put("/lancamentos-semanais/{lancamento_id}", response_model=LancamentoSemanalResponse)
@@ -446,6 +518,14 @@ def editar_lancamento_semanal(
     if not funcionario:
         raise HTTPException(status_code=404, detail= "Funcionário não encontrado.")
     
+    if funcionario_recebe_toneladas(
+        funcionario,
+        dados.ajuste_personalizado_itens,
+        dados.ajuste_personalizado_descricao,
+        dados.ajuste_personalizado_operacao,
+    ) and not (dados.numero_nota_fiscal or "").strip():
+        raise HTTPException(status_code=400, detail="Informe o nÃºmero da nota fiscal.")
+
     if dados.penalidade and not dados.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
 
@@ -473,6 +553,10 @@ def editar_lancamento_semanal(
     lancamento.pedidos_separados = dados.pedidos_separados
     lancamento.pedidos_carregados = dados.pedidos_carregados
     lancamento.toneladas = dados.toneladas
+    lancamento.numero_nota_fiscal = (dados.numero_nota_fiscal or "").strip() or None
+    if dados.nota_fiscal_pdf:
+        lancamento.nota_fiscal_pdf = validar_pdf_nota_fiscal(dados.nota_fiscal_pdf)
+        lancamento.nota_fiscal_pdf_nome = (dados.nota_fiscal_pdf_nome or "").strip() or "nota-fiscal.pdf"
     lancamento.entregas = dados.entregas
     lancamento.retornos = dados.retornos
     lancamento.nota = dados.nota
@@ -857,7 +941,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
 
 
 @app.get("/exportar-fechamento/{mes}")
-def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
+def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(get_db)):
     funcionarios = db.query(Funcionario).order_by(Funcionario.nome).all()
     mes_formatado = formatar_mes_para_semana(mes)
     descontos_mapa = desconto_por_funcionario(db, mes)
@@ -941,7 +1025,8 @@ def exportar_excel_fechamento(mes: str, db: Session = Depends(get_db)):
         fechamento=fechamento,
         lancamentos=todos_lancamentos,
         frequencias=todas_frequencias,
-        funcionarios=funcionarios
+        funcionarios=funcionarios,
+        base_url=str(request.base_url).rstrip("/")
     )
 
     nome_arquivo = f"fechamento_{mes}.xlsx"

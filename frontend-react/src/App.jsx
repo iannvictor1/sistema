@@ -668,6 +668,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     pedidos_separados: 0,
     pedidos_carregados: 0,
     toneladas: 0,
+    numero_nota_fiscal: "",
+    nota_fiscal_pdf: null,
+    nota_fiscal_pdf_nome: null,
     entregas: 0,
     retornos: 0,
     nota: 3,
@@ -744,6 +747,18 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   const editingEmployee = editingEntry ? employeeMap[editingEntry.funcionario_id] : null;
   const editingEmployeeTurn = normalizeText(editingEmployee?.turno);
   const editingEmployeeIsDelivery = isDeliveryEmployee(editingEmployee);
+  const selectedEmployeeReceivesTonnes = shouldShowCriterion(
+    customEntryEnabled ? form : withoutCustomAdjustments(form),
+    selectedEmployeeTurn,
+    selectedEmployeeIsDelivery,
+    "toneladas",
+  );
+  const editingEmployeeReceivesTonnes = editingEntry && shouldShowCriterion(
+    editingEntry,
+    editingEmployeeTurn,
+    editingEmployeeIsDelivery,
+    "toneladas",
+  );
   const monthlyIsDelivery = normalizeText(monthlyForm.tipo_funcionario) === "entrega";
   const monthlyIsCommercialHours = normalizeText(monthlyForm.filtro_turno) === "horario comercial";
   const showForm = mode !== "history";
@@ -824,6 +839,30 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     setter({ ...source, [criterion]: value });
   }
 
+  function selectInvoicePdf(file, setter) {
+    if (!file) {
+      setter((current) => ({ ...current, nota_fiscal_pdf: null, nota_fiscal_pdf_nome: null }));
+      return;
+    }
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+      setMessage("Selecione um arquivo PDF para a nota fiscal.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage("O PDF da nota fiscal deve ter no máximo 10 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = String(reader.result || "").split(",")[1] || null;
+      setter((current) => ({ ...current, nota_fiscal_pdf: base64, nota_fiscal_pdf_nome: file.name }));
+      setMessage("");
+    };
+    reader.onerror = () => setMessage("Não foi possível ler o PDF da nota fiscal.");
+    reader.readAsDataURL(file);
+  }
+
   function addCustomAdjustment(source, setter) {
     setter({
       ...source,
@@ -885,6 +924,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
         toneladas: 0,
         entregas: 0,
         retornos: 0,
+        numero_nota_fiscal: "",
+        nota_fiscal_pdf: null,
+        nota_fiscal_pdf_nome: null,
         ajustes_personalizados: [{ criterio: "pedidos_separados", operacao: "adicionar" }],
       }));
       setMessage(`Lançamento salvo. Bônus: ${currency.format(Number(saved.bonus_calculado || 0))}`);
@@ -979,6 +1021,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
         pedidos_separados: criterionValue(editingEntry, "pedidos_separados"),
         pedidos_carregados: criterionValue(editingEntry, "pedidos_carregados"),
         toneladas: criterionValue(editingEntry, "toneladas", editingEmployeeIsDelivery && !isCriterionAdded(editingEntry, "toneladas")),
+        numero_nota_fiscal: editingEmployeeReceivesTonnes ? editingEntry.numero_nota_fiscal || null : null,
+        nota_fiscal_pdf: editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf || null : null,
+        nota_fiscal_pdf_nome: editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf_nome || null : null,
         entregas: criterionValue(editingEntry, "entregas"),
         retornos: criterionValue(editingEntry, "retornos"),
         nota: Number(editingEntry.nota),
@@ -1023,6 +1068,30 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
             />
           )
         ))}
+
+        {editingEmployeeReceivesTonnes && (
+          <>
+            <input
+              placeholder="Número da nota fiscal"
+              required
+              value={editingEntry.numero_nota_fiscal || ""}
+              onChange={(event) => setEditingEntry({ ...editingEntry, numero_nota_fiscal: event.target.value })}
+            />
+            <label>
+              PDF da nota fiscal (opcional)
+              <input
+                accept="application/pdf,.pdf"
+                type="file"
+                onChange={(event) => selectInvoicePdf(event.target.files?.[0], setEditingEntry)}
+              />
+            </label>
+            {editingEntry.nota_fiscal_pdf_disponivel && !editingEntry.nota_fiscal_pdf && (
+              <a href={downloadUrl(`/lancamentos-semanais/${editingEntry.id}/nota-fiscal`)} rel="noreferrer" target="_blank">
+                Abrir PDF atual
+              </a>
+            )}
+          </>
+        )}
 
         <select value={editingEntry.nota} onChange={(event) => setEditingEntry({ ...editingEntry, nota: event.target.value })}>
           {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
@@ -1123,6 +1192,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                 toneladas: 0,
                 entregas: 0,
                 retornos: 0,
+                numero_nota_fiscal: "",
+                nota_fiscal_pdf: null,
+                nota_fiscal_pdf_nome: null,
               })
             }
             required
@@ -1146,6 +1218,24 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
               />
             )
           ))}
+          {selectedEmployeeReceivesTonnes && (
+            <>
+              <input
+                placeholder="Número da nota fiscal"
+                required
+                value={form.numero_nota_fiscal}
+                onChange={(event) => setForm({ ...form, numero_nota_fiscal: event.target.value })}
+              />
+              <label>
+                PDF da nota fiscal (opcional)
+                <input
+                  accept="application/pdf,.pdf"
+                  type="file"
+                  onChange={(event) => selectInvoicePdf(event.target.files?.[0], setForm)}
+                />
+              </label>
+            </>
+          )}
           <select value={form.nota} onChange={(event) => setForm({ ...form, nota: event.target.value })}>
             {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
           </select>
@@ -1424,7 +1514,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           <div className="table-wrap">
             <table className="history-table">
               <thead>
-                <tr><th>ID</th><th>Funcionário</th><th>Tipo</th><th>Semana</th><th>Nota</th><th>Ajuste</th><th>Bônus</th><th></th></tr>
+                <tr><th>ID</th><th>Funcionário</th><th>Tipo</th><th>Semana</th><th>Nota</th><th>Nota fiscal</th><th>Ajuste</th><th>Bônus</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredEntries.map((entry) => (
@@ -1435,11 +1525,23 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                       <td data-label="Tipo">{entry.tipo_lancamento}</td>
                       <td data-label="Semana">{entry.semana}</td>
                       <td data-label="Nota">{entry.nota}</td>
+                      <td data-label="Nota fiscal">{entry.numero_nota_fiscal || "-"}</td>
                       <td className="adjustment-cell" data-label="Ajuste" title={customAdjustmentSummary(entry)}>
                         {customAdjustmentSummary(entry)}
                       </td>
                       <td className="bonus-cell" data-label="Bônus">{currency.format(Number(entry.bonus_calculado || 0))}</td>
                       <td className="row-actions" data-label="Ações">
+                        {entry.nota_fiscal_pdf_disponivel && (
+                          <a
+                            className="icon-button"
+                            href={downloadUrl(`/lancamentos-semanais/${entry.id}/nota-fiscal`)}
+                            rel="noreferrer"
+                            target="_blank"
+                            title={`Abrir nota fiscal ${entry.numero_nota_fiscal || ""}`.trim()}
+                          >
+                            PDF
+                          </a>
+                        )}
                         <button 
                           className="icon-button"
                           onClick={() => setEditingEntry({
@@ -1460,7 +1562,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
 
                     {editingEntry?.id === entry.id && (
                       <tr className="inline-edit-row">
-                        <td colSpan="8">{renderEntryEditForm()}</td>
+                        <td colSpan="9">{renderEntryEditForm()}</td>
                       </tr>
                     )}
                   </Fragment>

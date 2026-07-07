@@ -34,6 +34,9 @@ class LancamentoSemanalCreate(BaseModel):
     tipo_lancamento: str = "semanal"
     data_lancamento: Optional[date] = None
     usuario_lancamento: Optional[str] = None
+    numero_nota_fiscal: str | None = None
+    nota_fiscal_pdf: str | None = None
+    nota_fiscal_pdf_nome: str | None = None
     pedidos_separados: int = 0
     pedidos_carregados: int = 0
     toneladas: float = 0
@@ -74,6 +77,9 @@ class LancamentoSemanalResponse(BaseModel):
     pedidos_separados: int
     pedidos_carregados: int
     toneladas: float
+    numero_nota_fiscal: str | None = None
+    nota_fiscal_pdf_nome: str | None = None
+    nota_fiscal_pdf_disponivel: bool = False
     entregas: int
     retornos: int
     nota: int
@@ -94,6 +100,9 @@ class LancamentoSemanalUpdate(BaseModel):
     pedidos_separados: int = 0
     pedidos_carregados: int = 0
     toneladas: float = 0
+    numero_nota_fiscal: str | None = None
+    nota_fiscal_pdf: str | None = None
+    nota_fiscal_pdf_nome: str | None = None
     entregas: int = 0
     retornos: int = 0
     nota: int
