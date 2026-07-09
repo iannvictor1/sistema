@@ -691,6 +691,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   const [message, setMessage] = useState("");
   const [entryMenuOpen, setEntryMenuOpen] = useState(false);
   const [customEntryEnabled, setCustomEntryEnabled] = useState(false);
+  const [invoiceFieldsEnabled, setInvoiceFieldsEnabled] = useState(false);
   const employeeMap = useMemo(() => Object.fromEntries(employees.map((employee) => [employee.id, employee])), [employees]);
   const [editingEntry, setEditingEntry] = useState(null);
   const [monthlyForm, setMonthlyForm] = useState({
@@ -753,6 +754,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     selectedEmployeeIsDelivery,
     "toneladas",
   );
+  const showInvoiceFields = invoiceFieldsEnabled && selectedEmployeeReceivesTonnes;
   const editingEmployeeReceivesTonnes = editingEntry && shouldShowCriterion(
     editingEntry,
     editingEmployeeTurn,
@@ -905,6 +907,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
       toneladas: criterionValue(formRules, "toneladas", selectedEmployeeIsDelivery && !isCriterionAdded(formRules, "toneladas")),
       entregas: criterionValue(formRules, "entregas"),
       retornos: criterionValue(formRules, "retornos"),
+      numero_nota_fiscal: showInvoiceFields ? form.numero_nota_fiscal || null : null,
+      nota_fiscal_pdf: showInvoiceFields ? form.nota_fiscal_pdf || null : null,
+      nota_fiscal_pdf_nome: showInvoiceFields ? form.nota_fiscal_pdf_nome || null : null,
       nota: Number(form.nota),
       motivo_penalidade: form.penalidade ? form.motivo_penalidade : null,
       ajuste_personalizado_descricao: firstAdjustment.criterio || null,
@@ -917,6 +922,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
       const saved = await api.post("/lancamentos-semanais", payload);
       await load();
       setCustomEntryEnabled(false);
+      setInvoiceFieldsEnabled(false);
       setForm((current) => ({
         ...current,
         pedidos_separados: 0,
@@ -1073,7 +1079,6 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           <>
             <input
               placeholder="Número da nota fiscal"
-              required
               value={editingEntry.numero_nota_fiscal || ""}
               onChange={(event) => setEditingEntry({ ...editingEntry, numero_nota_fiscal: event.target.value })}
             />
@@ -1177,13 +1182,33 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                   >
                     Lançamento personalizado
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInvoiceFieldsEnabled((enabled) => {
+                        const next = !enabled;
+                        if (!next) {
+                          setForm((current) => ({
+                            ...current,
+                            numero_nota_fiscal: "",
+                            nota_fiscal_pdf: null,
+                            nota_fiscal_pdf_nome: null,
+                          }));
+                        }
+                        return next;
+                      });
+                      setEntryMenuOpen(false);
+                    }}
+                  >
+                    {invoiceFieldsEnabled ? "Remover NF" : "Adicionar NF"}
+                  </button>
                 </div>
               )}
             </div>
           </div>
           <select
             value={form.funcionario_id}
-            onChange={(event) =>
+            onChange={(event) => {
               setForm({
                 ...form,
                 funcionario_id: event.target.value,
@@ -1195,8 +1220,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                 numero_nota_fiscal: "",
                 nota_fiscal_pdf: null,
                 nota_fiscal_pdf_nome: null,
-              })
-            }
+              });
+              setInvoiceFieldsEnabled(false);
+            }}
             required
           >
             <option value="">Funcionário</option>
@@ -1218,11 +1244,10 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
               />
             )
           ))}
-          {selectedEmployeeReceivesTonnes && (
+          {showInvoiceFields && (
             <>
               <input
                 placeholder="Número da nota fiscal"
-                required
                 value={form.numero_nota_fiscal}
                 onChange={(event) => setForm({ ...form, numero_nota_fiscal: event.target.value })}
               />

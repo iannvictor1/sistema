@@ -241,18 +241,6 @@ def funcionario_aplicavel_tipo(funcionario: Funcionario, tipo_funcionario: str) 
     return tipo_entrega == normalizar_texto(tipo_funcionario)
 
 
-def funcionario_recebe_toneladas(funcionario: Funcionario, itens: str | None, criterio: str | None, operacao: str | None) -> bool:
-    ajustes = carregar_ajustes_personalizados(itens, criterio, operacao)
-    if any(item.get("criterio") == "toneladas" and item.get("operacao") == "retirar" for item in ajustes):
-        return False
-    if any(item.get("criterio") == "toneladas" and item.get("operacao") == "adicionar" for item in ajustes):
-        return True
-
-    tipo_entrega = normalizar_texto(funcionario.tipo_entrega)
-    funcionario_entrega = tipo_entrega in {"entrega", "motorista", "ajudante", "ajudante de motorista"}
-    return not funcionario_entrega and normalizar_texto(funcionario.turno) == "manha"
-
-
 def get_db():
     db = SessionLocal()
     try:
@@ -405,13 +393,6 @@ def criar_lancamento_semanal(
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
 
-    if funcionario_recebe_toneladas(
-        funcionario,
-        lancamento.ajuste_personalizado_itens,
-        lancamento.ajuste_personalizado_descricao,
-        lancamento.ajuste_personalizado_operacao,
-    ) and not (lancamento.numero_nota_fiscal or "").strip():
-        raise HTTPException(status_code=400, detail="Informe o nÃºmero da nota fiscal.")
 
     if lancamento.penalidade and not lancamento.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
@@ -518,13 +499,6 @@ def editar_lancamento_semanal(
     if not funcionario:
         raise HTTPException(status_code=404, detail= "Funcionário não encontrado.")
     
-    if funcionario_recebe_toneladas(
-        funcionario,
-        dados.ajuste_personalizado_itens,
-        dados.ajuste_personalizado_descricao,
-        dados.ajuste_personalizado_operacao,
-    ) and not (dados.numero_nota_fiscal or "").strip():
-        raise HTTPException(status_code=400, detail="Informe o nÃºmero da nota fiscal.")
 
     if dados.penalidade and not dados.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
