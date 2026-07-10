@@ -665,7 +665,7 @@ table {
 }
 
 .history-table {
-  min-width: 0;
+  min-width: 1220px;
   table-layout: fixed;
 }
 
@@ -801,7 +801,7 @@ table {
 
 .history-table th:nth-child(2),
 .history-table td:nth-child(2) {
-  width: 30%;
+  width: 220px;
 }
 
 .history-table th:nth-child(3),
@@ -811,7 +811,7 @@ table {
 
 .history-table th:nth-child(4),
 .history-table td:nth-child(4) {
-  width: 165px;
+  width: 140px;
 }
 
 .history-table th:nth-child(5),
@@ -821,17 +821,27 @@ table {
 
 .history-table th:nth-child(6),
 .history-table td:nth-child(6) {
-  width: 23%;
+  width: 155px;
 }
 
 .history-table th:nth-child(7),
 .history-table td:nth-child(7) {
-  width: 125px;
+  width: 145px;
 }
 
 .history-table th:nth-child(8),
 .history-table td:nth-child(8) {
-  width: 118px;
+  width: 180px;
+}
+
+.history-table th:nth-child(9),
+.history-table td:nth-child(9) {
+  width: 135px;
+}
+
+.history-table th:nth-child(10),
+.history-table td:nth-child(10) {
+  width: 170px;
 }
 
 .closing-table-wrap {
@@ -978,7 +988,21 @@ td:first-child,
 .row-actions {
   text-align: right;
   white-space: nowrap;
-  width: 118px;
+}
+
+.row-actions .icon-button {
+  vertical-align: middle;
+}
+
+.pdf-button {
+  min-width: 54px;
+  padding: 0 10px;
+  text-decoration: none;
+  width: auto;
+}
+
+td .icon-button + .icon-button {
+  margin-left: 6px;
 }
 
 .inline-edit-row:hover {
@@ -1048,10 +1072,6 @@ td input[type="checkbox"] {
   height: 16px;
   min-height: 0;
   width: 16px;
-}
-
-td .icon-button + .icon-button {
-  margin-left: 6px;
 }
 
 .badge {

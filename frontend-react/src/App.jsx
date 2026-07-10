@@ -668,6 +668,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     pedidos_separados: 0,
     pedidos_carregados: 0,
     toneladas: 0,
+    numero_carregamento: "",
     numero_nota_fiscal: "",
     nota_fiscal_pdf: null,
     nota_fiscal_pdf_nome: null,
@@ -691,6 +692,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   const [message, setMessage] = useState("");
   const [entryMenuOpen, setEntryMenuOpen] = useState(false);
   const [customEntryEnabled, setCustomEntryEnabled] = useState(false);
+  const [loadingNumberFieldsEnabled, setLoadingNumberFieldsEnabled] = useState(false);
   const [invoiceFieldsEnabled, setInvoiceFieldsEnabled] = useState(false);
   const employeeMap = useMemo(() => Object.fromEntries(employees.map((employee) => [employee.id, employee])), [employees]);
   const [editingEntry, setEditingEntry] = useState(null);
@@ -755,6 +757,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     "toneladas",
   );
   const showInvoiceFields = invoiceFieldsEnabled && selectedEmployeeReceivesTonnes;
+  const showLoadingNumberFields = loadingNumberFieldsEnabled && Boolean(form.funcionario_id);
   const editingEmployeeReceivesTonnes = editingEntry && shouldShowCriterion(
     editingEntry,
     editingEmployeeTurn,
@@ -905,6 +908,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
       pedidos_separados: criterionValue(formRules, "pedidos_separados"),
       pedidos_carregados: criterionValue(formRules, "pedidos_carregados"),
       toneladas: criterionValue(formRules, "toneladas", selectedEmployeeIsDelivery && !isCriterionAdded(formRules, "toneladas")),
+      numero_carregamento: showLoadingNumberFields ? form.numero_carregamento || null : null,
       entregas: criterionValue(formRules, "entregas"),
       retornos: criterionValue(formRules, "retornos"),
       numero_nota_fiscal: showInvoiceFields ? form.numero_nota_fiscal || null : null,
@@ -922,12 +926,14 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
       const saved = await api.post("/lancamentos-semanais", payload);
       await load();
       setCustomEntryEnabled(false);
+      setLoadingNumberFieldsEnabled(false);
       setInvoiceFieldsEnabled(false);
       setForm((current) => ({
         ...current,
         pedidos_separados: 0,
         pedidos_carregados: 0,
         toneladas: 0,
+        numero_carregamento: "",
         entregas: 0,
         retornos: 0,
         numero_nota_fiscal: "",
@@ -1027,6 +1033,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
         pedidos_separados: criterionValue(editingEntry, "pedidos_separados"),
         pedidos_carregados: criterionValue(editingEntry, "pedidos_carregados"),
         toneladas: criterionValue(editingEntry, "toneladas", editingEmployeeIsDelivery && !isCriterionAdded(editingEntry, "toneladas")),
+        numero_carregamento: editingEntry.numero_carregamento || null,
         numero_nota_fiscal: editingEmployeeReceivesTonnes ? editingEntry.numero_nota_fiscal || null : null,
         nota_fiscal_pdf: editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf || null : null,
         nota_fiscal_pdf_nome: editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf_nome || null : null,
@@ -1074,6 +1081,12 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
             />
           )
         ))}
+
+        <input
+          placeholder="N° carregamento"
+          value={editingEntry.numero_carregamento || ""}
+          onChange={(event) => setEditingEntry({ ...editingEntry, numero_carregamento: event.target.value })}
+        />
 
         {editingEmployeeReceivesTonnes && (
           <>
@@ -1202,6 +1215,24 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                   >
                     {invoiceFieldsEnabled ? "Remover NF" : "Adicionar NF"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoadingNumberFieldsEnabled((enabled) => {
+                        const next = !enabled;
+                        if (!next) {
+                          setForm((current) => ({
+                            ...current,
+                            numero_carregamento: "",
+                          }));
+                        }
+                        return next;
+                      });
+                      setEntryMenuOpen(false);
+                    }}
+                  >
+                    {loadingNumberFieldsEnabled ? "Remover N° carregamento" : "Adicionar N° carregamento"}
+                  </button>
                 </div>
               )}
             </div>
@@ -1217,10 +1248,12 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                 toneladas: 0,
                 entregas: 0,
                 retornos: 0,
+                numero_carregamento: "",
                 numero_nota_fiscal: "",
                 nota_fiscal_pdf: null,
                 nota_fiscal_pdf_nome: null,
               });
+              setLoadingNumberFieldsEnabled(false);
               setInvoiceFieldsEnabled(false);
             }}
             required
@@ -1244,6 +1277,13 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
               />
             )
           ))}
+          {showLoadingNumberFields && (
+            <input
+              placeholder="N° carregamento"
+              value={form.numero_carregamento}
+              onChange={(event) => setForm({ ...form, numero_carregamento: event.target.value })}
+            />
+          )}
           {showInvoiceFields && (
             <>
               <input
@@ -1539,7 +1579,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           <div className="table-wrap">
             <table className="history-table">
               <thead>
-                <tr><th>ID</th><th>Funcionário</th><th>Tipo</th><th>Semana</th><th>Nota</th><th>Nota fiscal</th><th>Ajuste</th><th>Bônus</th><th></th></tr>
+                <tr><th>ID</th><th>Funcionário</th><th>Tipo</th><th>Semana</th><th>Nota</th><th>N° carregamento</th><th>Nota fiscal</th><th>Ajuste</th><th>Bônus</th><th></th></tr>
               </thead>
               <tbody>
                 {filteredEntries.map((entry) => (
@@ -1550,6 +1590,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                       <td data-label="Tipo">{entry.tipo_lancamento}</td>
                       <td data-label="Semana">{entry.semana}</td>
                       <td data-label="Nota">{entry.nota}</td>
+                      <td data-label="N° carregamento">{entry.numero_carregamento || "-"}</td>
                       <td data-label="Nota fiscal">{entry.numero_nota_fiscal || "-"}</td>
                       <td className="adjustment-cell" data-label="Ajuste" title={customAdjustmentSummary(entry)}>
                         {customAdjustmentSummary(entry)}
@@ -1558,7 +1599,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                       <td className="row-actions" data-label="Ações">
                         {entry.nota_fiscal_pdf_disponivel && (
                           <a
-                            className="icon-button"
+                            className="icon-button pdf-button"
                             href={downloadUrl(`/lancamentos-semanais/${entry.id}/nota-fiscal`)}
                             rel="noreferrer"
                             target="_blank"
@@ -1587,7 +1628,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
 
                     {editingEntry?.id === entry.id && (
                       <tr className="inline-edit-row">
-                        <td colSpan="9">{renderEntryEditForm()}</td>
+                        <td colSpan="10">{renderEntryEditForm()}</td>
                       </tr>
                     )}
                   </Fragment>

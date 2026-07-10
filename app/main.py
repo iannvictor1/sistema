@@ -95,6 +95,7 @@ def garantir_colunas_lancamento():
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_operacao TEXT"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_valor DOUBLE PRECISION DEFAULT 0"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS ajuste_personalizado_itens TEXT"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS numero_carregamento TEXT"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS numero_nota_fiscal TEXT"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS nota_fiscal_pdf TEXT"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS nota_fiscal_pdf_nome TEXT"))
@@ -116,6 +117,8 @@ def garantir_colunas_lancamento():
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_valor REAL DEFAULT 0"))
         if "ajuste_personalizado_itens" not in colunas:
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN ajuste_personalizado_itens TEXT"))
+        if "numero_carregamento" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN numero_carregamento TEXT"))
         if "numero_nota_fiscal" not in colunas:
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN numero_nota_fiscal TEXT"))
         if "nota_fiscal_pdf" not in colunas:
@@ -431,6 +434,7 @@ def criar_lancamento_semanal(
         pedidos_separados=lancamento.pedidos_separados,
         pedidos_carregados=lancamento.pedidos_carregados,
         toneladas=lancamento.toneladas,
+        numero_carregamento=(lancamento.numero_carregamento or "").strip() or None,
         numero_nota_fiscal=(lancamento.numero_nota_fiscal or "").strip() or None,
         nota_fiscal_pdf=validar_pdf_nota_fiscal(lancamento.nota_fiscal_pdf),
         nota_fiscal_pdf_nome=(lancamento.nota_fiscal_pdf_nome or "").strip() or None,
@@ -527,6 +531,7 @@ def editar_lancamento_semanal(
     lancamento.pedidos_separados = dados.pedidos_separados
     lancamento.pedidos_carregados = dados.pedidos_carregados
     lancamento.toneladas = dados.toneladas
+    lancamento.numero_carregamento = (dados.numero_carregamento or "").strip() or None
     lancamento.numero_nota_fiscal = (dados.numero_nota_fiscal or "").strip() or None
     if dados.nota_fiscal_pdf:
         lancamento.nota_fiscal_pdf = validar_pdf_nota_fiscal(dados.nota_fiscal_pdf)

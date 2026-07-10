@@ -27,6 +27,7 @@ class LancamentoSemanal(Base):
     pedidos_separados = Column(Integer, default=0)
     pedidos_carregados = Column(Integer, default=0)
     toneladas = Column(Float, default=0)
+    numero_carregamento = Column(String, nullable=True)
     numero_nota_fiscal = Column(String, nullable=True)
     nota_fiscal_pdf = Column(Text, nullable=True)
     nota_fiscal_pdf_nome = Column(String, nullable=True)
