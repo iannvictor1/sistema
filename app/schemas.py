@@ -116,6 +116,41 @@ class LancamentoSemanalUpdate(BaseModel):
     ajuste_personalizado_valor: float = 0
     ajuste_personalizado_itens: str | None = None
 
+
+class RecebimentoToneladasCreate(BaseModel):
+    semana: str
+    data_lancamento: Optional[date] = None
+    usuario_lancamento: Optional[str] = None
+    toneladas: float
+    numero_carregamento: str | None = None
+    numero_nota_fiscal: str | None = None
+    nota_fiscal_pdf: str | None = None
+    nota_fiscal_pdf_nome: str | None = None
+
+
+class RecebimentoToneladasResponse(BaseModel):
+    id: int
+    semana: str
+    data_lancamento: Optional[date] = None
+    data_registro: Optional[date] = None
+    usuario_lancamento: Optional[str] = None
+    toneladas: float
+    numero_carregamento: str | None = None
+    numero_nota_fiscal: str | None = None
+    nota_fiscal_pdf_nome: str | None = None
+    nota_fiscal_pdf_disponivel: bool = False
+    status: str
+    participantes: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class RecebimentoParticipantesUpdate(BaseModel):
+    funcionario_ids: list[int]
+    usuario_lancamento: Optional[str] = None
+
+
 class FrequenciaMensalCreate(BaseModel):
     funcionario_id: int
     mes: str

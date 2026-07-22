@@ -47,6 +47,27 @@ class LancamentoSemanal(Base):
         return bool(self.nota_fiscal_pdf)
 
 
+class RecebimentoToneladas(Base):
+    __tablename__ = "recebimentos_toneladas"
+
+    id = Column(Integer, primary_key=True, index=True)
+    semana = Column(String, nullable=False)
+    data_lancamento = Column(Date, nullable=True)
+    data_registro = Column(Date, nullable=True)
+    usuario_lancamento = Column(String, nullable=True)
+    toneladas = Column(Float, default=0)
+    numero_carregamento = Column(String, nullable=True)
+    numero_nota_fiscal = Column(String, nullable=True)
+    nota_fiscal_pdf = Column(Text, nullable=True)
+    nota_fiscal_pdf_nome = Column(String, nullable=True)
+    status = Column(String, default="pendente")
+    participantes = Column(Text, nullable=True)
+
+    @property
+    def nota_fiscal_pdf_disponivel(self):
+        return bool(self.nota_fiscal_pdf)
+
+
 class FrequenciaMensal(Base):
     __tablename__ = "frequencias_mensais"
 

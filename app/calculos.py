@@ -171,10 +171,15 @@ def calcular_bonus_mensal(lancamentos, ausencias: int, nota_atual: int | None = 
     if ausencias > 0:
         return 0.0
 
+    lancamentos_producao = [
+        lancamento for lancamento in lancamentos
+        if normalizar_texto(getattr(lancamento, "tipo_lancamento", "")) != "avaliacao_semanal"
+    ]
+
     if nota_atual is None:
-        total = sum(l.bonus_calculado for l in lancamentos)
+        total = sum(l.bonus_calculado for l in lancamentos_producao)
     else:
-        base_periodo = sum(calcular_base_lancamento(l, funcionario) for l in lancamentos)
+        base_periodo = sum(calcular_base_lancamento(l, funcionario) for l in lancamentos_producao)
         total = base_periodo * fator_da_nota(nota_atual)
 
     total += 150.0

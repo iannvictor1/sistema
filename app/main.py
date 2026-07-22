@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from .database import Base, engine, SessionLocal
-from .models import Funcionario, LancamentoSemanal, FrequenciaMensal, DescontoFechamento
+from .models import Funcionario, LancamentoSemanal, RecebimentoToneladas, FrequenciaMensal, DescontoFechamento
 from .schemas import (
     FuncionarioCreate,
     FuncionarioResponse,
@@ -16,6 +16,9 @@ from .schemas import (
     FrequenciaMensalCreate,
     FrequenciaMensalResponse,
     LancamentoSemanalUpdate,
+    RecebimentoToneladasCreate,
+    RecebimentoToneladasResponse,
+    RecebimentoParticipantesUpdate,
     DescontoFechamentoCreate,
     DescontoFechamentoResponse
 )
@@ -192,11 +195,15 @@ def resumir_frequencias(frequencias: list[FrequenciaMensal]) -> tuple[int, str]:
 
 
 def nota_atual_lancamentos(lancamentos: list[LancamentoSemanal]) -> int | None:
-    if not lancamentos:
+    avaliacoes = [
+        lancamento for lancamento in lancamentos
+        if normalizar_texto(lancamento.tipo_lancamento) == "avaliacao_semanal"
+    ]
+    if not avaliacoes:
         return None
 
     lancamento_atual = max(
-        lancamentos,
+        avaliacoes,
         key=lambda lancamento: (
             lancamento.data_lancamento or date.min,
             lancamento.data_registro or date.min,
@@ -204,6 +211,12 @@ def nota_atual_lancamentos(lancamentos: list[LancamentoSemanal]) -> int | None:
         ),
     )
     return lancamento_atual.nota
+
+
+def lancamento_conta_producao(lancamento: LancamentoSemanal) -> bool:
+    return normalizar_texto(lancamento.tipo_lancamento) not in {
+        "avaliacao_semanal",
+    }
 
 
 def desconto_por_funcionario(db: Session, mes: str) -> dict[int, DescontoFechamento]:
@@ -242,6 +255,16 @@ def funcionario_aplicavel_tipo(funcionario: Funcionario, tipo_funcionario: str) 
     if normalizar_texto(tipo_funcionario) == "entrega":
         return tipo_entrega in {"entrega", "motorista", "ajudante", "ajudante de motorista"}
     return tipo_entrega == normalizar_texto(tipo_funcionario)
+
+
+def funcionario_recebe_por_toneladas(funcionario: Funcionario) -> bool:
+    tipo_entrega = normalizar_texto(funcionario.tipo_entrega)
+    return normalizar_texto(funcionario.turno) == "manha" and tipo_entrega not in {
+        "entrega",
+        "motorista",
+        "ajudante",
+        "ajudante de motorista",
+    }
 
 
 def get_db():
@@ -387,6 +410,7 @@ def criar_lancamento_semanal(
     request: Request,
     db: Session = Depends(get_db)
 ):
+    tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
     funcionario = (
         db.query(Funcionario)
         .filter(Funcionario.id == lancamento.funcionario_id)
@@ -397,6 +421,15 @@ def criar_lancamento_semanal(
         raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
 
 
+    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario):
+        raise HTTPException(
+            status_code=400,
+            detail="Funcionarios que recebem por toneladas devem ser lancados apenas em Recebimento de toneladas."
+        )
+
+    if tipo_lancamento == "avaliacao_semanal" and lancamento.nota not in {1, 2, 3, 4, 5}:
+        raise HTTPException(status_code=400, detail="Informe uma nota valida entre 1 e 5.")
+
     if lancamento.penalidade and not lancamento.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
 
@@ -405,24 +438,28 @@ def criar_lancamento_semanal(
     else:
         motivo_penalidade = lancamento.motivo_penalidade
 
-    bonus = calcular_bonus(
-        tipo_entrega=funcionario.tipo_entrega,
-        pedidos_separados=lancamento.pedidos_separados,
-        pedidos_carregados=lancamento.pedidos_carregados,
-        toneladas=lancamento.toneladas,
-        entregas=lancamento.entregas,
-        retornos=lancamento.retornos,
-        nota=lancamento.nota,
-        penalidade=lancamento.penalidade,
-        turno=funcionario.turno,
-        criterio_personalizado=lancamento.ajuste_personalizado_descricao,
-        operacao_personalizada=lancamento.ajuste_personalizado_operacao,
-        ajustes_personalizados=carregar_ajustes_personalizados(
-            lancamento.ajuste_personalizado_itens,
-            lancamento.ajuste_personalizado_descricao,
-            lancamento.ajuste_personalizado_operacao,
-        ),
-    )
+    nota = lancamento.nota if tipo_lancamento == "avaliacao_semanal" else 5
+    if tipo_lancamento == "avaliacao_semanal":
+        bonus = 0.0
+    else:
+        bonus = calcular_bonus(
+            tipo_entrega=funcionario.tipo_entrega,
+            pedidos_separados=lancamento.pedidos_separados,
+            pedidos_carregados=lancamento.pedidos_carregados,
+            toneladas=lancamento.toneladas,
+            entregas=lancamento.entregas,
+            retornos=lancamento.retornos,
+            nota=5,
+            penalidade=lancamento.penalidade,
+            turno=funcionario.turno,
+            criterio_personalizado=lancamento.ajuste_personalizado_descricao,
+            operacao_personalizada=lancamento.ajuste_personalizado_operacao,
+            ajustes_personalizados=carregar_ajustes_personalizados(
+                lancamento.ajuste_personalizado_itens,
+                lancamento.ajuste_personalizado_descricao,
+                lancamento.ajuste_personalizado_operacao,
+            ),
+        )
 
     novo = LancamentoSemanal(
         funcionario_id=lancamento.funcionario_id,
@@ -440,7 +477,7 @@ def criar_lancamento_semanal(
         nota_fiscal_pdf_nome=(lancamento.nota_fiscal_pdf_nome or "").strip() or None,
         entregas=lancamento.entregas,
         retornos=lancamento.retornos,
-        nota=lancamento.nota,
+        nota=nota,
         penalidade=lancamento.penalidade,
         motivo_penalidade=motivo_penalidade,
         ajuste_personalizado_descricao=lancamento.ajuste_personalizado_descricao,
@@ -459,6 +496,115 @@ def criar_lancamento_semanal(
 @app.get("/lancamentos-semanais", response_model=list[LancamentoSemanalResponse])
 def listar_lancamentos_semanais(db: Session = Depends(get_db)):
     return db.query(LancamentoSemanal).order_by(LancamentoSemanal.id.desc()).all()
+
+
+@app.post("/recebimentos-toneladas", response_model=RecebimentoToneladasResponse)
+def criar_recebimento_toneladas(
+    recebimento: RecebimentoToneladasCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    if recebimento.toneladas <= 0:
+        raise HTTPException(status_code=400, detail="Informe uma quantidade de toneladas maior que zero.")
+
+    novo = RecebimentoToneladas(
+        semana=recebimento.semana,
+        data_lancamento=recebimento.data_lancamento,
+        data_registro=date.today(),
+        usuario_lancamento=usuario_da_requisicao(recebimento.usuario_lancamento, request),
+        toneladas=recebimento.toneladas,
+        numero_carregamento=(recebimento.numero_carregamento or "").strip() or None,
+        numero_nota_fiscal=(recebimento.numero_nota_fiscal or "").strip() or None,
+        nota_fiscal_pdf=validar_pdf_nota_fiscal(recebimento.nota_fiscal_pdf),
+        nota_fiscal_pdf_nome=(recebimento.nota_fiscal_pdf_nome or "").strip() or None,
+        status="pendente",
+        participantes=None,
+    )
+    db.add(novo)
+    db.commit()
+    db.refresh(novo)
+    return novo
+
+
+@app.get("/recebimentos-toneladas", response_model=list[RecebimentoToneladasResponse])
+def listar_recebimentos_toneladas(db: Session = Depends(get_db)):
+    return db.query(RecebimentoToneladas).order_by(RecebimentoToneladas.id.desc()).all()
+
+
+@app.post("/recebimentos-toneladas/{recebimento_id}/participantes", response_model=list[LancamentoSemanalResponse])
+def confirmar_participantes_recebimento(
+    recebimento_id: int,
+    dados: RecebimentoParticipantesUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    recebimento = (
+        db.query(RecebimentoToneladas)
+        .filter(RecebimentoToneladas.id == recebimento_id)
+        .first()
+    )
+    if not recebimento:
+        raise HTTPException(status_code=404, detail="Recebimento nao encontrado.")
+    if recebimento.status == "distribuido":
+        raise HTTPException(status_code=400, detail="Este recebimento ja foi distribuido.")
+
+    funcionario_ids = list(dict.fromkeys(dados.funcionario_ids))
+    if not funcionario_ids:
+        raise HTTPException(status_code=400, detail="Selecione ao menos um participante.")
+
+    funcionarios = (
+        db.query(Funcionario)
+        .filter(Funcionario.id.in_(funcionario_ids), Funcionario.ativo == True)
+        .all()
+    )
+    if len(funcionarios) != len(funcionario_ids):
+        raise HTTPException(status_code=400, detail="Todos os participantes precisam ser funcionarios ativos.")
+
+    usuario = usuario_da_requisicao(dados.usuario_lancamento, request)
+    criados = []
+    for funcionario in funcionarios:
+        bonus = calcular_bonus(
+            tipo_entrega=funcionario.tipo_entrega,
+            pedidos_separados=0,
+            pedidos_carregados=0,
+            toneladas=recebimento.toneladas,
+            entregas=0,
+            retornos=0,
+            nota=5,
+            penalidade=False,
+            turno=funcionario.turno,
+        )
+        novo = LancamentoSemanal(
+            funcionario_id=funcionario.id,
+            semana=recebimento.semana,
+            tipo_lancamento="recebimento_toneladas",
+            data_lancamento=recebimento.data_lancamento,
+            data_registro=date.today(),
+            usuario_lancamento=usuario,
+            pedidos_separados=0,
+            pedidos_carregados=0,
+            toneladas=recebimento.toneladas,
+            numero_carregamento=recebimento.numero_carregamento,
+            numero_nota_fiscal=recebimento.numero_nota_fiscal,
+            nota_fiscal_pdf=recebimento.nota_fiscal_pdf,
+            nota_fiscal_pdf_nome=recebimento.nota_fiscal_pdf_nome,
+            entregas=0,
+            retornos=0,
+            nota=5,
+            penalidade=False,
+            motivo_penalidade=None,
+            bonus_calculado=bonus,
+        )
+        db.add(novo)
+        criados.append(novo)
+
+    recebimento.status = "distribuido"
+    recebimento.participantes = json.dumps(funcionario_ids)
+    db.commit()
+
+    for criado in criados:
+        db.refresh(criado)
+    return criados
 
 
 @app.get("/lancamentos-semanais/{lancamento_id}/nota-fiscal")
@@ -504,27 +650,41 @@ def editar_lancamento_semanal(
         raise HTTPException(status_code=404, detail= "Funcionário não encontrado.")
     
 
+    tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
+    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario):
+        raise HTTPException(
+            status_code=400,
+            detail="Funcionarios que recebem por toneladas devem ser lancados apenas em Recebimento de toneladas."
+        )
+
+    if tipo_lancamento == "avaliacao_semanal" and dados.nota not in {1, 2, 3, 4, 5}:
+        raise HTTPException(status_code=400, detail="Informe uma nota valida entre 1 e 5.")
+
     if dados.penalidade and not dados.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
 
-    bonus = calcular_bonus(
-        tipo_entrega=funcionario.tipo_entrega,
-        pedidos_separados=dados.pedidos_separados,
-        pedidos_carregados=dados.pedidos_carregados,
-        toneladas=dados.toneladas,
-        entregas=dados.entregas,
-        retornos=dados.retornos,
-        nota=dados.nota,
-        penalidade=dados.penalidade,
-        turno=funcionario.turno,
-        criterio_personalizado=dados.ajuste_personalizado_descricao,
-        operacao_personalizada=dados.ajuste_personalizado_operacao,
-        ajustes_personalizados=carregar_ajustes_personalizados(
-            dados.ajuste_personalizado_itens,
-            dados.ajuste_personalizado_descricao,
-            dados.ajuste_personalizado_operacao,
-        ),
-    )
+    nota = dados.nota if tipo_lancamento == "avaliacao_semanal" else 5
+    if tipo_lancamento == "avaliacao_semanal":
+        bonus = 0.0
+    else:
+        bonus = calcular_bonus(
+            tipo_entrega=funcionario.tipo_entrega,
+            pedidos_separados=dados.pedidos_separados,
+            pedidos_carregados=dados.pedidos_carregados,
+            toneladas=dados.toneladas,
+            entregas=dados.entregas,
+            retornos=dados.retornos,
+            nota=5,
+            penalidade=dados.penalidade,
+            turno=funcionario.turno,
+            criterio_personalizado=dados.ajuste_personalizado_descricao,
+            operacao_personalizada=dados.ajuste_personalizado_operacao,
+            ajustes_personalizados=carregar_ajustes_personalizados(
+                dados.ajuste_personalizado_itens,
+                dados.ajuste_personalizado_descricao,
+                dados.ajuste_personalizado_operacao,
+            ),
+        )
         
     lancamento.semana = dados.semana
     lancamento.data_lancamento = dados.data_lancamento
@@ -538,7 +698,7 @@ def editar_lancamento_semanal(
         lancamento.nota_fiscal_pdf_nome = (dados.nota_fiscal_pdf_nome or "").strip() or "nota-fiscal.pdf"
     lancamento.entregas = dados.entregas
     lancamento.retornos = dados.retornos
-    lancamento.nota = dados.nota
+    lancamento.nota = nota
     lancamento.penalidade = dados.penalidade
     lancamento.motivo_penalidade = dados.motivo_penalidade if dados.penalidade else None
     lancamento.ajuste_personalizado_descricao = dados.ajuste_personalizado_descricao
@@ -881,6 +1041,10 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             lancamento for lancamento in lancamentos_funcionario
             if lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
         ]
+        lancamentos_producao = [
+            lancamento for lancamento in lancamentos
+            if lancamento_conta_producao(lancamento)
+        ]
 
         if status_mes == "Férias":
             nota_atual = nota_atual_lancamentos(lancamentos)
@@ -890,7 +1054,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             ausencias = 0
         else:
             nota_atual = nota_atual_lancamentos(lancamentos)
-            bonus_bruto = calcular_bonus_mensal(lancamentos, ausencias, nota_atual, funcionario)
+            bonus_bruto = calcular_bonus_mensal(lancamentos_producao, ausencias, nota_atual, funcionario)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
 
@@ -905,7 +1069,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             "cargo": funcionario.cargo,
             "mes": mes,
             "ausencias": ausencias,
-            "quantidade_lancamentos": len(lancamentos),
+            "quantidade_lancamentos": len(lancamentos_producao),
             "nota_atual": nota_atual,
             "bonus_bruto": bonus_bruto,
             "desconto": desconto,
@@ -947,6 +1111,10 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
             lancamento for lancamento in lancamentos_funcionario
             if lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
         ]
+        lancamentos_producao = [
+            lancamento for lancamento in lancamentos_mes
+            if lancamento_conta_producao(lancamento)
+        ]
         nota_atual = nota_atual_lancamentos(lancamentos_mes)
 
         if status_mes == "Férias":
@@ -957,7 +1125,7 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
         
         else:
             nota_atual = nota_atual_lancamentos(lancamentos_mes)
-            bonus_bruto = calcular_bonus_mensal(lancamentos_mes, ausencias, nota_atual, funcionario)
+            bonus_bruto = calcular_bonus_mensal(lancamentos_producao, ausencias, nota_atual, funcionario)
             assiduidade = 150.0 if ausencias == 0 else 0.0
             elegivel = ausencias == 0
 
@@ -972,7 +1140,7 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
             "cargo": funcionario.cargo,
             "mes": mes,
             "ausencias": ausencias,
-            "quantidade_lancamentos": len(lancamentos_mes),
+            "quantidade_lancamentos": len(lancamentos_producao),
             "nota_atual": nota_atual,
             "bonus_bruto": bonus_bruto,
             "desconto": desconto,

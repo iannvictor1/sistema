@@ -80,6 +80,7 @@ const USERS = {
   valesca: "Rhcem123@",
   paulo: "Cempaulo123@",
   romario: "Cemromario123@",
+  gabriel: "Cemgabriel123@",
   ronilson: "Cemroni123@",
   kayke: "Cemkayke123@",
   junior: "Cemjunior123@"
@@ -106,6 +107,7 @@ function readLoggedUser() {
 function useApiData() {
   const [employees, setEmployees] = useState([]);
   const [entries, setEntries] = useState([]);
+  const [receipts, setReceipts] = useState([]);
   const [frequencies, setFrequencies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -114,13 +116,15 @@ function useApiData() {
     setLoading(true);
     setError("");
     try {
-      const [funcionarios, lancamentos, frequencias] = await Promise.all([
+      const [funcionarios, lancamentos, recebimentos, frequencias] = await Promise.all([
         api.get("/funcionarios"),
         api.get("/lancamentos-semanais"),
+        api.get("/recebimentos-toneladas"),
         api.get("/frequencias"),
       ]);
       setEmployees(funcionarios);
       setEntries(lancamentos);
+      setReceipts(recebimentos);
       setFrequencies(frequencias);
     } catch (err) {
       setError(errorMessage(err));
@@ -133,7 +137,7 @@ function useApiData() {
     load();
   }, []);
 
-  return { employees, entries, frequencies, loading, error, load };
+  return { employees, entries, receipts, frequencies, loading, error, load };
 }
 
 export function App() {
@@ -660,7 +664,7 @@ function Employees({ employees, load }) {
   );
 }
 
-function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
+function Entries({ employees, entries, receipts = [], load, mode = "all", loggedUser = "" }) {
   const [form, setForm] = useState({
     funcionario_id: "",
     tipo_lancamento: "semanal",
@@ -694,6 +698,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   const [customEntryEnabled, setCustomEntryEnabled] = useState(false);
   const [loadingNumberFieldsEnabled, setLoadingNumberFieldsEnabled] = useState(false);
   const [invoiceFieldsEnabled, setInvoiceFieldsEnabled] = useState(false);
+  const [receiptParticipants, setReceiptParticipants] = useState({});
+  const [receiptMenuOpen, setReceiptMenuOpen] = useState(null);
+  const [receiptExtraEmployeeId, setReceiptExtraEmployeeId] = useState({});
   const employeeMap = useMemo(() => Object.fromEntries(employees.map((employee) => [employee.id, employee])), [employees]);
   const [editingEntry, setEditingEntry] = useState(null);
   const [monthlyForm, setMonthlyForm] = useState({
@@ -714,6 +721,25 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "");
+  }
+
+  function isSupervisorUser(user) {
+    return ["admin", "iann", "valesca", "paulo", "romario", "gabriel", "junior"].includes(normalizeText(user));
+  }
+
+  function isExpeditionUser(user) {
+    return ["ronilson", "kayke"].includes(normalizeText(user));
+  }
+
+  function entryTypeLabel(type) {
+    const labels = {
+      diario: "Diário",
+      semanal: "Semanal",
+      mensal: "Mensal",
+      avaliacao_semanal: "Avaliação semanal",
+      recebimento_toneladas: "Recebimento toneladas",
+    };
+    return labels[normalizeText(type)] || type || "-";
   }
 
   function appliesToMonthly(employee) {
@@ -738,6 +764,51 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     return ["entrega", "motorista", "ajudante", "ajudante de motorista"].includes(
       normalizeText(employee?.tipo_entrega),
     );
+  }
+
+  function isMorningEmployee(employee) {
+    return normalizeText(employee?.turno) === "manha";
+  }
+
+  function isDefaultReceiptEmployee(employee) {
+    return isMorningEmployee(employee) && !isDeliveryEmployee(employee);
+  }
+
+  function receivesByTonnes(employee) {
+    return isMorningEmployee(employee) && !isDeliveryEmployee(employee);
+  }
+
+  function receiptVisibleEmployees(receipt) {
+    const selected = receiptParticipants[receipt.id] || {};
+    return employees.filter((employee) => (
+      employee.ativo && (isDefaultReceiptEmployee(employee) || selected[employee.id])
+    ));
+  }
+
+  function receiptExtraEmployeeOptions(receipt) {
+    const selected = receiptParticipants[receipt.id] || {};
+    return employees.filter((employee) => (
+      employee.ativo && !isDefaultReceiptEmployee(employee) && !selected[employee.id]
+    ));
+  }
+
+  function toggleReceiptParticipant(receiptId, employeeId, selected) {
+    setReceiptParticipants((current) => ({
+      ...current,
+      [receiptId]: {
+        ...(current[receiptId] || {}),
+        [employeeId]: selected,
+      },
+    }));
+  }
+
+  function addReceiptExtraEmployee(receiptId) {
+    const employeeId = Number(receiptExtraEmployeeId[receiptId] || 0);
+    if (!employeeId) return;
+
+    toggleReceiptParticipant(receiptId, employeeId, true);
+    setReceiptExtraEmployeeId((current) => ({ ...current, [receiptId]: "" }));
+    setReceiptMenuOpen(null);
   }
 
   const monthlyEmployees = useMemo(
@@ -766,6 +837,15 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   );
   const monthlyIsDelivery = normalizeText(monthlyForm.tipo_funcionario) === "entrega";
   const monthlyIsCommercialHours = normalizeText(monthlyForm.filtro_turno) === "horario comercial";
+  const isReceiptEntry = form.tipo_lancamento === "recebimento_toneladas";
+  const isEvaluationEntry = form.tipo_lancamento === "avaliacao_semanal";
+  const isNormalEntry = ["semanal", "diario"].includes(form.tipo_lancamento);
+  const availableEntryEmployees = employees.filter((employee) => (
+    employee.ativo && (!isNormalEntry || !receivesByTonnes(employee))
+  ));
+  const canCreateSupervisorEntries = isSupervisorUser(loggedUser);
+  const canChooseReceiptParticipants = isExpeditionUser(loggedUser);
+  const pendingReceipts = receipts.filter((receipt) => normalizeText(receipt.status) === "pendente");
   const showForm = mode !== "history";
   const showHistory = mode !== "form";
 
@@ -894,32 +974,88 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     return { ...source, ajustes_personalizados: [], ajuste_personalizado_itens: null };
   }
 
+  function changeEntryType(type) {
+    const nextIsNormalEntry = ["semanal", "diario"].includes(type);
+    const currentEmployee = form.funcionario_id ? employeeMap[form.funcionario_id] : null;
+    setForm((current) => ({
+      ...current,
+      tipo_lancamento: type,
+      funcionario_id: nextIsNormalEntry && receivesByTonnes(currentEmployee) ? "" : current.funcionario_id,
+      pedidos_separados: 0,
+      pedidos_carregados: 0,
+      toneladas: 0,
+      entregas: 0,
+      retornos: 0,
+      numero_carregamento: "",
+      numero_nota_fiscal: "",
+      nota_fiscal_pdf: null,
+      nota_fiscal_pdf_nome: null,
+    }));
+    setLoadingNumberFieldsEnabled(false);
+    setInvoiceFieldsEnabled(false);
+  }
+
   async function saveEntry(event) {
     event.preventDefault();
+    if (isReceiptEntry) {
+      setMessage("");
+      try {
+        await api.post("/recebimentos-toneladas", {
+          semana: weekLabel(form.data_lancamento),
+          usuario_lancamento: loggedUser || null,
+          data_lancamento: form.data_lancamento,
+          toneladas: Number(form.toneladas || 0),
+          numero_carregamento: form.numero_carregamento || null,
+          numero_nota_fiscal: form.numero_nota_fiscal || null,
+          nota_fiscal_pdf: form.nota_fiscal_pdf || null,
+          nota_fiscal_pdf_nome: form.nota_fiscal_pdf_nome || null,
+        });
+        await load();
+        setForm((current) => ({
+          ...current,
+          toneladas: 0,
+          numero_carregamento: "",
+          numero_nota_fiscal: "",
+          nota_fiscal_pdf: null,
+          nota_fiscal_pdf_nome: null,
+        }));
+        setMessage("Recebimento enviado para a expedição escolher os participantes.");
+      } catch (err) {
+        setMessage(errorMessage(err));
+      }
+      return;
+    }
+
+    if (isNormalEntry && receivesByTonnes(selectedEmployee)) {
+      setMessage("Funcionários que recebem por toneladas devem entrar apenas em Recebimento de toneladas.");
+      return;
+    }
+
     const adjustments = customEntryEnabled ? normalizedCustomAdjustments(form) : [];
     const formRules = customEntryEnabled ? form : withoutCustomAdjustments(form);
     const firstAdjustment = adjustments[0] || {};
     const payload = {
       ...form,
       funcionario_id: Number(form.funcionario_id),
-      semana: form.tipo_lancamento === "diario" ? weekLabel(form.data_lancamento) : weekLabel(form.data_lancamento),
+      semana: weekLabel(form.data_lancamento),
       usuario_lancamento: loggedUser || null,
       data_lancamento: form.data_lancamento,
-      pedidos_separados: criterionValue(formRules, "pedidos_separados"),
-      pedidos_carregados: criterionValue(formRules, "pedidos_carregados"),
-      toneladas: criterionValue(formRules, "toneladas", selectedEmployeeIsDelivery && !isCriterionAdded(formRules, "toneladas")),
+      pedidos_separados: isEvaluationEntry ? 0 : criterionValue(formRules, "pedidos_separados"),
+      pedidos_carregados: isEvaluationEntry ? 0 : criterionValue(formRules, "pedidos_carregados"),
+      toneladas: isEvaluationEntry ? 0 : criterionValue(formRules, "toneladas", selectedEmployeeIsDelivery && !isCriterionAdded(formRules, "toneladas")),
       numero_carregamento: showLoadingNumberFields ? form.numero_carregamento || null : null,
-      entregas: criterionValue(formRules, "entregas"),
-      retornos: criterionValue(formRules, "retornos"),
+      entregas: isEvaluationEntry ? 0 : criterionValue(formRules, "entregas"),
+      retornos: isEvaluationEntry ? 0 : criterionValue(formRules, "retornos"),
       numero_nota_fiscal: showInvoiceFields ? form.numero_nota_fiscal || null : null,
       nota_fiscal_pdf: showInvoiceFields ? form.nota_fiscal_pdf || null : null,
       nota_fiscal_pdf_nome: showInvoiceFields ? form.nota_fiscal_pdf_nome || null : null,
-      nota: Number(form.nota),
-      motivo_penalidade: form.penalidade ? form.motivo_penalidade : null,
-      ajuste_personalizado_descricao: firstAdjustment.criterio || null,
-      ajuste_personalizado_operacao: firstAdjustment.operacao || null,
-      ajuste_personalizado_valor: firstAdjustment.criterio ? criterionValue(form, firstAdjustment.criterio) : 0,
-      ajuste_personalizado_itens: adjustments.length ? JSON.stringify(adjustments) : null,
+      nota: isEvaluationEntry ? Number(form.nota) : 5,
+      penalidade: isEvaluationEntry ? false : form.penalidade,
+      motivo_penalidade: !isEvaluationEntry && form.penalidade ? form.motivo_penalidade : null,
+      ajuste_personalizado_descricao: isEvaluationEntry ? null : firstAdjustment.criterio || null,
+      ajuste_personalizado_operacao: isEvaluationEntry ? null : firstAdjustment.operacao || null,
+      ajuste_personalizado_valor: !isEvaluationEntry && firstAdjustment.criterio ? criterionValue(form, firstAdjustment.criterio) : 0,
+      ajuste_personalizado_itens: !isEvaluationEntry && adjustments.length ? JSON.stringify(adjustments) : null,
     };
     setMessage("");
     try {
@@ -941,7 +1077,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
         nota_fiscal_pdf_nome: null,
         ajustes_personalizados: [{ criterio: "pedidos_separados", operacao: "adicionar" }],
       }));
-      setMessage(`Lançamento salvo. Bônus: ${currency.format(Number(saved.bonus_calculado || 0))}`);
+      setMessage(isEvaluationEntry ? "Avaliação semanal salva." : `Lançamento salvo. Bônus: ${currency.format(Number(saved.bonus_calculado || 0))}`);
     } catch (err) {
       setMessage(errorMessage(err));
     }
@@ -990,6 +1126,30 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
     }
   }
 
+  async function saveReceiptParticipants(receiptId) {
+    const selectedIds = Object.entries(receiptParticipants[receiptId] || {})
+      .filter(([, selected]) => selected)
+      .map(([id]) => Number(id));
+
+    if (!selectedIds.length) {
+      setMessage("Selecione ao menos um participante do recebimento.");
+      return;
+    }
+
+    setMessage("");
+    try {
+      const saved = await api.post(`/recebimentos-toneladas/${receiptId}/participantes`, {
+        funcionario_ids: selectedIds,
+        usuario_lancamento: loggedUser || null,
+      });
+      await load();
+      setReceiptParticipants((current) => ({ ...current, [receiptId]: {} }));
+      setMessage(`Recebimento distribuído para ${saved.length} participante(s).`);
+    } catch (err) {
+      setMessage(errorMessage(err));
+    }
+  }
+
   const filteredEntries = entries.filter((entry) => {
     const employee = employeeMap[entry.funcionario_id] || {};
     const entryType = normalizeText(entry.tipo_lancamento || "semanal");
@@ -1023,6 +1183,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
   async function updateEntry(event) {
     event.preventDefault();
     setMessage("");
+    const editingIsEvaluation = normalizeText(editingEntry.tipo_lancamento) === "avaliacao_semanal";
     const adjustments = normalizedCustomAdjustments(editingEntry);
     const firstAdjustment = adjustments[0] || {};
 
@@ -1030,24 +1191,24 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
       await api.put(`/lancamentos-semanais/${editingEntry.id}`, {
         semana: editingEntry.semana,
         data_lancamento: editingEntry.data_lancamento,
-        pedidos_separados: criterionValue(editingEntry, "pedidos_separados"),
-        pedidos_carregados: criterionValue(editingEntry, "pedidos_carregados"),
-        toneladas: criterionValue(editingEntry, "toneladas", editingEmployeeIsDelivery && !isCriterionAdded(editingEntry, "toneladas")),
-        numero_carregamento: editingEntry.numero_carregamento || null,
-        numero_nota_fiscal: editingEmployeeReceivesTonnes ? editingEntry.numero_nota_fiscal || null : null,
-        nota_fiscal_pdf: editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf || null : null,
-        nota_fiscal_pdf_nome: editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf_nome || null : null,
-        entregas: criterionValue(editingEntry, "entregas"),
-        retornos: criterionValue(editingEntry, "retornos"),
-        nota: Number(editingEntry.nota),
-        penalidade: Boolean(editingEntry.penalidade),
-        motivo_penalidade: editingEntry.penalidade
+        pedidos_separados: editingIsEvaluation ? 0 : criterionValue(editingEntry, "pedidos_separados"),
+        pedidos_carregados: editingIsEvaluation ? 0 : criterionValue(editingEntry, "pedidos_carregados"),
+        toneladas: editingIsEvaluation ? 0 : criterionValue(editingEntry, "toneladas", editingEmployeeIsDelivery && !isCriterionAdded(editingEntry, "toneladas")),
+        numero_carregamento: editingIsEvaluation ? null : editingEntry.numero_carregamento || null,
+        numero_nota_fiscal: !editingIsEvaluation && editingEmployeeReceivesTonnes ? editingEntry.numero_nota_fiscal || null : null,
+        nota_fiscal_pdf: !editingIsEvaluation && editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf || null : null,
+        nota_fiscal_pdf_nome: !editingIsEvaluation && editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf_nome || null : null,
+        entregas: editingIsEvaluation ? 0 : criterionValue(editingEntry, "entregas"),
+        retornos: editingIsEvaluation ? 0 : criterionValue(editingEntry, "retornos"),
+        nota: editingIsEvaluation ? Number(editingEntry.nota) : 5,
+        penalidade: editingIsEvaluation ? false : Boolean(editingEntry.penalidade),
+        motivo_penalidade: !editingIsEvaluation && editingEntry.penalidade
         ? editingEntry.motivo_penalidade
         : null,
-        ajuste_personalizado_descricao: firstAdjustment.criterio || null,
-        ajuste_personalizado_operacao: firstAdjustment.operacao || null,
-        ajuste_personalizado_valor: firstAdjustment.criterio ? criterionValue(editingEntry, firstAdjustment.criterio) : 0,
-        ajuste_personalizado_itens: adjustments.length ? JSON.stringify(adjustments) : null,
+        ajuste_personalizado_descricao: editingIsEvaluation ? null : firstAdjustment.criterio || null,
+        ajuste_personalizado_operacao: editingIsEvaluation ? null : firstAdjustment.operacao || null,
+        ajuste_personalizado_valor: !editingIsEvaluation && firstAdjustment.criterio ? criterionValue(editingEntry, firstAdjustment.criterio) : 0,
+        ajuste_personalizado_itens: !editingIsEvaluation && adjustments.length ? JSON.stringify(adjustments) : null,
       });
 
       setEditingEntry(null);
@@ -1060,6 +1221,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
 
   function renderEntryEditForm() {
     if (!editingEntry) return null;
+    const editingIsEvaluation = normalizeText(editingEntry.tipo_lancamento) === "avaliacao_semanal";
 
     return (
       <form className="inline-edit-form form-grid entries-form" onSubmit={updateEntry}>
@@ -1068,7 +1230,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
         <input value={editingEntry.semana} onChange={(event) => setEditingEntry({ ...editingEntry, semana: event.target.value })} required />
         <input type="date" value={editingEntry.data_lancamento || ""} onChange={(event) => setEditingEntry({ ...editingEntry, data_lancamento: event.target.value })} />
 
-        {bonusCriteria.map((criterion) => (
+        {!editingIsEvaluation && bonusCriteria.map((criterion) => (
           shouldShowCriterion(editingEntry, editingEmployeeTurn, editingEmployeeIsDelivery, criterion.id) && (
             <input
               key={criterion.id}
@@ -1082,13 +1244,15 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           )
         ))}
 
+        {!editingIsEvaluation && (
         <input
           placeholder="N° carregamento"
           value={editingEntry.numero_carregamento || ""}
           onChange={(event) => setEditingEntry({ ...editingEntry, numero_carregamento: event.target.value })}
         />
+        )}
 
-        {editingEmployeeReceivesTonnes && (
+        {!editingIsEvaluation && editingEmployeeReceivesTonnes && (
           <>
             <input
               placeholder="Número da nota fiscal"
@@ -1111,19 +1275,24 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           </>
         )}
 
+        {editingIsEvaluation && (
         <select value={editingEntry.nota} onChange={(event) => setEditingEntry({ ...editingEntry, nota: event.target.value })}>
           {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
         </select>
+        )}
 
+        {!editingIsEvaluation && (
         <label className="check">
           <input checked={editingEntry.penalidade} type="checkbox" onChange={(event) => setEditingEntry({ ...editingEntry, penalidade: event.target.checked })} />
           Penalidade
         </label>
+        )}
 
         {editingEntry.penalidade && (
           <input placeholder="Motivo" value={editingEntry.motivo_penalidade || ""} onChange={(event) => setEditingEntry({ ...editingEntry, motivo_penalidade: event.target.value })} required />
         )}
 
+        {!editingIsEvaluation && (
         <div className="custom-adjustment-fields">
           {customAdjustments(editingEntry).map((adjustment, index) => (
             <Fragment key={`${adjustment.criterio}-${index}`}>
@@ -1143,6 +1312,7 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
             <Plus size={17} /> Adicionar critério
           </button>
         </div>
+        )}
 
         <button className="primary" type="submit"><Save size={17} /> Salvar alterações</button>
         <button className="icon-button" onClick={() => setEditingEntry(null)} type="button">X</button>
@@ -1156,17 +1326,19 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
         <>
           <div className="panel form-grid">
             <h2>Novo lançamento</h2>
-            <select value={form.tipo_lancamento} onChange={(event) => setForm({ ...form, tipo_lancamento: event.target.value })}>
+            <select value={form.tipo_lancamento} onChange={(event) => changeEntryType(event.target.value)}>
               <option value="semanal">Semanal</option>
               <option value="diario">Diário</option>
-              <option value="mensal">Mensal</option>
+              {canCreateSupervisorEntries && <option value="recebimento_toneladas">Recebimento de toneladas</option>}
+              {canCreateSupervisorEntries && <option value="avaliacao_semanal">Avaliação semanal</option>}
             </select>
           </div>
 
           {form.tipo_lancamento !== "mensal" && (
             <form className="panel form-grid entries-form" onSubmit={saveEntry}>
           <div className="entry-form-title">
-            <h2>{form.tipo_lancamento === "diario" ? "Lançamento diário" : "Lançamento semanal"}</h2>
+            <h2>{entryTypeLabel(form.tipo_lancamento)}</h2>
+            {!isReceiptEntry && !isEvaluationEntry && (
             <div className={`entry-actions ${entryMenuOpen ? "open" : ""}`}>
               <button
                 className="icon-button"
@@ -1236,7 +1408,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                 </div>
               )}
             </div>
+            )}
           </div>
+          {!isReceiptEntry && (
           <select
             value={form.funcionario_id}
             onChange={(event) => {
@@ -1259,12 +1433,13 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
             required
           >
             <option value="">Funcionário</option>
-            {employees.filter((employee) => employee.ativo).map((employee) => (
+            {availableEntryEmployees.map((employee) => (
               <option key={employee.id} value={employee.id}>{employeeLabel(employee)}</option>
             ))}
           </select>
+          )}
           <input type="date" value={form.data_lancamento} onChange={(event) => setForm({ ...form, data_lancamento: event.target.value })} />
-          {bonusCriteria.map((criterion) => (
+          {!isEvaluationEntry && bonusCriteria.map((criterion) => (
             shouldShowCriterion(customEntryEnabled ? form : withoutCustomAdjustments(form), selectedEmployeeTurn, selectedEmployeeIsDelivery, criterion.id) && (
               <input
                 key={criterion.id}
@@ -1277,6 +1452,41 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
               />
             )
           ))}
+          {isReceiptEntry && (
+            <input
+              min="0"
+              step="0.1"
+              type="number"
+              placeholder="Toneladas recebidas"
+              value={form.toneladas}
+              onChange={(event) => setForm({ ...form, toneladas: event.target.value })}
+              required
+            />
+          )}
+          {isReceiptEntry && (
+            <input
+              placeholder="N° carregamento"
+              value={form.numero_carregamento}
+              onChange={(event) => setForm({ ...form, numero_carregamento: event.target.value })}
+            />
+          )}
+          {isReceiptEntry && (
+            <>
+              <input
+                placeholder="Número da nota fiscal"
+                value={form.numero_nota_fiscal}
+                onChange={(event) => setForm({ ...form, numero_nota_fiscal: event.target.value })}
+              />
+              <label>
+                PDF da nota fiscal (opcional)
+                <input
+                  accept="application/pdf,.pdf"
+                  type="file"
+                  onChange={(event) => selectInvoicePdf(event.target.files?.[0], setForm)}
+                />
+              </label>
+            </>
+          )}
           {showLoadingNumberFields && (
             <input
               placeholder="N° carregamento"
@@ -1301,15 +1511,19 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
               </label>
             </>
           )}
+          {isEvaluationEntry && (
           <select value={form.nota} onChange={(event) => setForm({ ...form, nota: event.target.value })}>
             {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
           </select>
+          )}
+          {!isEvaluationEntry && !isReceiptEntry && (
           <label className="check">
             <input checked={form.penalidade} type="checkbox" onChange={(event) => setForm({ ...form, penalidade: event.target.checked })} />
             Penalidade
           </label>
+          )}
           {form.penalidade && <input placeholder="Motivo" value={form.motivo_penalidade} onChange={(event) => setForm({ ...form, motivo_penalidade: event.target.value })} required />}
-          {customEntryEnabled && (
+          {customEntryEnabled && !isEvaluationEntry && !isReceiptEntry && (
             <div className="custom-adjustment-fields">
               {customAdjustments(form).map((adjustment, index) => (
                 <Fragment key={`${adjustment.criterio}-${index}`}>
@@ -1494,6 +1708,86 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
           </button>
             </form>
           )}
+
+          {canChooseReceiptParticipants && (
+            <section className="panel receipt-panel">
+              <div className="section-heading">
+                <div>
+                  <h2>Recebimentos pendentes</h2>
+                  <p>{pendingReceipts.length} lançamento(s) aguardando participantes</p>
+                </div>
+              </div>
+
+              {!pendingReceipts.length && <div className="alert">Nenhum recebimento pendente.</div>}
+
+              {pendingReceipts.map((receipt) => (
+                <div className="receipt-card" key={receipt.id}>
+                  <div className="receipt-card-header">
+                    <div>
+                      <strong>{Number(receipt.toneladas || 0).toLocaleString("pt-BR")} toneladas</strong>
+                      <span>{receipt.semana} · {receipt.data_lancamento || "-"} · Supervisor: {receipt.usuario_lancamento || "-"}</span>
+                      <small>NF {receipt.numero_nota_fiscal || "-"} · Carregamento {receipt.numero_carregamento || "-"}</small>
+                    </div>
+
+                    <div className={`entry-actions ${receiptMenuOpen === receipt.id ? "open" : ""}`}>
+                      <button
+                        className="icon-button"
+                        onClick={() => setReceiptMenuOpen((current) => (current === receipt.id ? null : receipt.id))}
+                        title="Mais opções"
+                        type="button"
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {receiptMenuOpen === receipt.id && (
+                        <div className="entry-actions-menu receipt-actions-menu">
+                          <label>
+                            Adicionar funcionário
+                            <select
+                              value={receiptExtraEmployeeId[receipt.id] || ""}
+                              onChange={(event) =>
+                                setReceiptExtraEmployeeId((current) => ({
+                                  ...current,
+                                  [receipt.id]: event.target.value,
+                                }))
+                              }
+                            >
+                              <option value="">Selecione</option>
+                              {receiptExtraEmployeeOptions(receipt).map((employee) => (
+                                <option key={employee.id} value={employee.id}>
+                                  {employee.nome} - {employee.turno || "Sem turno"}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <button onClick={() => addReceiptExtraEmployee(receipt.id)} type="button">
+                            Adicionar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="participant-grid">
+                    {receiptVisibleEmployees(receipt).map((employee) => (
+                      <label className="check" key={employee.id}>
+                        <input
+                          checked={Boolean(receiptParticipants[receipt.id]?.[employee.id])}
+                          type="checkbox"
+                          onChange={(event) => toggleReceiptParticipant(receipt.id, employee.id, event.target.checked)}
+                        />
+                        {employee.nome}
+                        {!isMorningEmployee(employee) && <small>{employee.turno}</small>}
+                      </label>
+                    ))}
+                  </div>
+
+                  <button className="primary" onClick={() => saveReceiptParticipants(receipt.id)} type="button">
+                    <Save size={17} /> Confirmar participantes
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
         </>
       )}
 
@@ -1539,6 +1833,8 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                 <option value="diario">Diário</option>
                 <option value="semanal">Semanal</option>
                 <option value="mensal">Mensal</option>
+                <option value="recebimento_toneladas">Recebimento toneladas</option>
+                <option value="avaliacao_semanal">Avaliação semanal</option>
               </select>
             </label>
 
@@ -1587,9 +1883,9 @@ function Entries({ employees, entries, load, mode = "all", loggedUser = "" }) {
                     <tr>
                       <td data-label="ID">{entry.id}</td>
                       <td data-label="Funcionário">{employeeMap[entry.funcionario_id]?.nome || `#${entry.funcionario_id}`}</td>
-                      <td data-label="Tipo">{entry.tipo_lancamento}</td>
+                      <td data-label="Tipo">{entryTypeLabel(entry.tipo_lancamento)}</td>
                       <td data-label="Semana">{entry.semana}</td>
-                      <td data-label="Nota">{entry.nota}</td>
+                      <td data-label="Nota">{normalizeText(entry.tipo_lancamento) === "avaliacao_semanal" ? entry.nota : "-"}</td>
                       <td data-label="N° carregamento">{entry.numero_carregamento || "-"}</td>
                       <td data-label="Nota fiscal">{entry.numero_nota_fiscal || "-"}</td>
                       <td className="adjustment-cell" data-label="Ajuste" title={customAdjustmentSummary(entry)}>
