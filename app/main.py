@@ -279,10 +279,6 @@ def usuario_supervisor(usuario: str | None) -> bool:
     }
 
 
-def lancamento_personalizado(ajuste_itens: str | None, criterio: str | None, operacao: str | None) -> bool:
-    return bool(ajuste_itens or (criterio and operacao))
-
-
 def get_db():
     db = SessionLocal()
     try:
@@ -438,15 +434,11 @@ def criar_lancamento_semanal(
         raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
 
 
-    personalizado_supervisor = (
-        usuario_supervisor(usuario_lancamento)
-        and lancamento_personalizado(
-            lancamento.ajuste_personalizado_itens,
-            lancamento.ajuste_personalizado_descricao,
-            lancamento.ajuste_personalizado_operacao,
-        )
-    )
-    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario) and not personalizado_supervisor:
+    if (
+        tipo_lancamento in {"semanal", "diario"}
+        and funcionario_recebe_por_toneladas(funcionario)
+        and not usuario_supervisor(usuario_lancamento)
+    ):
         raise HTTPException(
             status_code=400,
             detail="Funcionarios que recebem por toneladas devem ser lancados apenas em Recebimento de toneladas."
@@ -678,15 +670,11 @@ def editar_lancamento_semanal(
 
     tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
     usuario_edicao = usuario_da_requisicao(None, request) or lancamento.usuario_lancamento
-    personalizado_supervisor = (
-        usuario_supervisor(usuario_edicao)
-        and lancamento_personalizado(
-            dados.ajuste_personalizado_itens,
-            dados.ajuste_personalizado_descricao,
-            dados.ajuste_personalizado_operacao,
-        )
-    )
-    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario) and not personalizado_supervisor:
+    if (
+        tipo_lancamento in {"semanal", "diario"}
+        and funcionario_recebe_por_toneladas(funcionario)
+        and not usuario_supervisor(usuario_edicao)
+    ):
         raise HTTPException(
             status_code=400,
             detail="Funcionarios que recebem por toneladas devem ser lancados apenas em Recebimento de toneladas."
