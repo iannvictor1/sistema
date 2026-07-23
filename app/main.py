@@ -267,6 +267,22 @@ def funcionario_recebe_por_toneladas(funcionario: Funcionario) -> bool:
     }
 
 
+def usuario_supervisor(usuario: str | None) -> bool:
+    return normalizar_texto(usuario) in {
+        "admin",
+        "iann",
+        "valesca",
+        "paulo",
+        "romario",
+        "gabriel",
+        "junior",
+    }
+
+
+def lancamento_personalizado(ajuste_itens: str | None, criterio: str | None, operacao: str | None) -> bool:
+    return bool(ajuste_itens or (criterio and operacao))
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -411,6 +427,7 @@ def criar_lancamento_semanal(
     db: Session = Depends(get_db)
 ):
     tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
+    usuario_lancamento = usuario_da_requisicao(lancamento.usuario_lancamento, request)
     funcionario = (
         db.query(Funcionario)
         .filter(Funcionario.id == lancamento.funcionario_id)
@@ -421,7 +438,15 @@ def criar_lancamento_semanal(
         raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
 
 
-    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario):
+    personalizado_supervisor = (
+        usuario_supervisor(usuario_lancamento)
+        and lancamento_personalizado(
+            lancamento.ajuste_personalizado_itens,
+            lancamento.ajuste_personalizado_descricao,
+            lancamento.ajuste_personalizado_operacao,
+        )
+    )
+    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario) and not personalizado_supervisor:
         raise HTTPException(
             status_code=400,
             detail="Funcionarios que recebem por toneladas devem ser lancados apenas em Recebimento de toneladas."
@@ -467,7 +492,7 @@ def criar_lancamento_semanal(
         tipo_lancamento=lancamento.tipo_lancamento,
         data_lancamento=lancamento.data_lancamento,
         data_registro=date.today(),
-        usuario_lancamento=usuario_da_requisicao(lancamento.usuario_lancamento, request),
+        usuario_lancamento=usuario_lancamento,
         pedidos_separados=lancamento.pedidos_separados,
         pedidos_carregados=lancamento.pedidos_carregados,
         toneladas=lancamento.toneladas,
@@ -629,6 +654,7 @@ def baixar_nota_fiscal(lancamento_id: int, db: Session = Depends(get_db)):
 def editar_lancamento_semanal(
     lancamento_id: int,
     dados: LancamentoSemanalUpdate,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     lancamento = (
@@ -651,7 +677,16 @@ def editar_lancamento_semanal(
     
 
     tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
-    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario):
+    usuario_edicao = usuario_da_requisicao(None, request) or lancamento.usuario_lancamento
+    personalizado_supervisor = (
+        usuario_supervisor(usuario_edicao)
+        and lancamento_personalizado(
+            dados.ajuste_personalizado_itens,
+            dados.ajuste_personalizado_descricao,
+            dados.ajuste_personalizado_operacao,
+        )
+    )
+    if tipo_lancamento in {"semanal", "diario"} and funcionario_recebe_por_toneladas(funcionario) and not personalizado_supervisor:
         raise HTTPException(
             status_code=400,
             detail="Funcionarios que recebem por toneladas devem ser lancados apenas em Recebimento de toneladas."

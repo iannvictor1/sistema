@@ -840,8 +840,9 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   const isReceiptEntry = form.tipo_lancamento === "recebimento_toneladas";
   const isEvaluationEntry = form.tipo_lancamento === "avaliacao_semanal";
   const isNormalEntry = ["semanal", "diario"].includes(form.tipo_lancamento);
+  const customSupervisorEntry = customEntryEnabled && isSupervisorUser(loggedUser);
   const availableEntryEmployees = employees.filter((employee) => (
-    employee.ativo && (!isNormalEntry || !receivesByTonnes(employee))
+    employee.ativo && (!isNormalEntry || !receivesByTonnes(employee) || customSupervisorEntry)
   ));
   const canCreateSupervisorEntries = isSupervisorUser(loggedUser);
   const canChooseReceiptParticipants = isExpeditionUser(loggedUser);
@@ -977,10 +978,11 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   function changeEntryType(type) {
     const nextIsNormalEntry = ["semanal", "diario"].includes(type);
     const currentEmployee = form.funcionario_id ? employeeMap[form.funcionario_id] : null;
+    const keepTonnesEmployee = customEntryEnabled && isSupervisorUser(loggedUser);
     setForm((current) => ({
       ...current,
       tipo_lancamento: type,
-      funcionario_id: nextIsNormalEntry && receivesByTonnes(currentEmployee) ? "" : current.funcionario_id,
+      funcionario_id: nextIsNormalEntry && receivesByTonnes(currentEmployee) && !keepTonnesEmployee ? "" : current.funcionario_id,
       pedidos_separados: 0,
       pedidos_carregados: 0,
       toneladas: 0,
@@ -1026,7 +1028,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
       return;
     }
 
-    if (isNormalEntry && receivesByTonnes(selectedEmployee)) {
+    if (isNormalEntry && receivesByTonnes(selectedEmployee) && !customSupervisorEntry) {
       setMessage("Funcionários que recebem por toneladas devem entrar apenas em Recebimento de toneladas.");
       return;
     }
