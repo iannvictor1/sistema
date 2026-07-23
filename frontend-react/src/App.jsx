@@ -342,6 +342,8 @@ function Dashboard({ employees, entries }) {
   const closingByEmployee = new Map(closing.map((item) => [item.funcionario_id, item]));
   const filteredRankingItems = [...dashboardEntries.reduce((items, entry) => {
     const employee = employeeById.get(entry.funcionario_id);
+    if (!employee?.ativo) return items;
+
     const current = items.get(entry.funcionario_id) || {
       funcionario_id: entry.funcionario_id,
       funcionario: employee?.nome || `Funcionário #${entry.funcionario_id}`,
@@ -1949,6 +1951,7 @@ function Frequencies({ employees, frequencies, load }) {
     tipo_falta: "Falta",
   });
   const employeeMap = useMemo(() => Object.fromEntries(employees.map((employee) => [employee.id, employee])), [employees]);
+  const activeEmployees = employees.filter((employee) => employee.ativo);
   const [message, setMessage] = useState("");
   const [editingFrequency, setEditingFrequency] = useState(null);
 
@@ -2024,7 +2027,7 @@ function Frequencies({ employees, frequencies, load }) {
 
         <select value={editingFrequency.funcionario_id} onChange={(event) => setEditingFrequency({ ...editingFrequency, funcionario_id: event.target.value })} required>
           <option value="">Funcionário</option>
-          {employees.map((employee) => <option key={employee.id} value={employee.id}>{employeeLabel(employee)}</option>)}
+          {activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employeeLabel(employee)}</option>)}
         </select>
 
         <input type="month" value={editingFrequency.mes} onChange={(event) => setEditingFrequency({ ...editingFrequency, mes: event.target.value })} />
@@ -2075,7 +2078,7 @@ function Frequencies({ employees, frequencies, load }) {
         <h2>Registrar frequência</h2>
         <select value={form.funcionario_id} onChange={(event) => setForm({ ...form, funcionario_id: event.target.value })} required>
           <option value="">Funcionário</option>
-          {employees.map((employee) => <option key={employee.id} value={employee.id}>{employeeLabel(employee)}</option>)}
+          {activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employeeLabel(employee)}</option>)}
         </select>
         <input type="month" value={form.mes} onChange={(event) => setForm({ ...form, mes: event.target.value })} />
         <select value={form.status_mes} onChange={(event) => setForm({ ...form, status_mes: event.target.value })}>

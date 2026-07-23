@@ -296,6 +296,14 @@ def usuario_da_requisicao(valor_payload: str | None, request: Request) -> str | 
     return usuario_header or None
 
 
+def exigir_funcionario_ativo(funcionario: Funcionario):
+    if not funcionario.ativo:
+        raise HTTPException(
+            status_code=400,
+            detail="Funcionario inativo nao pode receber lancamentos, frequencias ou descontos."
+        )
+
+
 @app.get("/")
 def home():
     if FRONTEND_INDEX.exists():
@@ -433,6 +441,7 @@ def criar_lancamento_semanal(
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado.")
 
+    exigir_funcionario_ativo(funcionario)
 
     if (
         tipo_lancamento in {"semanal", "diario"}
@@ -668,6 +677,8 @@ def editar_lancamento_semanal(
         raise HTTPException(status_code=404, detail= "Funcionário não encontrado.")
     
 
+    exigir_funcionario_ativo(funcionario)
+
     tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
     usuario_edicao = usuario_da_requisicao(None, request) or lancamento.usuario_lancamento
     if (
@@ -853,6 +864,8 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         frequencia.data_falta = None
         frequencia.tipo_falta = None
 
+    exigir_funcionario_ativo(funcionario)
+
     existente = (
         db.query(FrequenciaMensal)
         .filter(
@@ -933,6 +946,8 @@ def editar_frequencia(
         dados.data_falta = None
         dados.tipo_falta = None
 
+    exigir_funcionario_ativo(funcionario)
+
     frequencia.funcionario_id = dados.funcionario_id
     frequencia.mes = dados.mes
     frequencia.ausencias = dados.ausencias
@@ -977,6 +992,8 @@ def salvar_desconto_fechamento(
 
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionario nao encontrado.")
+
+    exigir_funcionario_ativo(funcionario)
 
     if len(desconto.mes or "") != 7:
         raise HTTPException(status_code=400, detail="Informe o mes no formato AAAA-MM.")
@@ -1038,7 +1055,12 @@ def excluir_desconto_fechamento(
 
 @app.get("/fechamento/{mes}")
 def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
-    funcionarios = db.query(Funcionario).order_by(Funcionario.nome).all()
+    funcionarios = (
+        db.query(Funcionario)
+        .filter(Funcionario.ativo == True)
+        .order_by(Funcionario.nome)
+        .all()
+    )
     resultado = []
     mes_formatado = formatar_mes_para_semana(mes)
     descontos_mapa = desconto_por_funcionario(db, mes)
@@ -1108,7 +1130,13 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
 
 @app.get("/exportar-fechamento/{mes}")
 def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(get_db)):
-    funcionarios = db.query(Funcionario).order_by(Funcionario.nome).all()
+    funcionarios = (
+        db.query(Funcionario)
+        .filter(Funcionario.ativo == True)
+        .order_by(Funcionario.nome)
+        .all()
+    )
+    funcionario_ids_ativos = {funcionario.id for funcionario in funcionarios}
     mes_formatado = formatar_mes_para_semana(mes)
     descontos_mapa = desconto_por_funcionario(db, mes)
 
@@ -1180,12 +1208,16 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
         .order_by(LancamentoSemanal.id.desc())
         .all()
         )
-        if lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
+        if lancamento.funcionario_id in funcionario_ids_ativos
+        and lancamento_pertence_ao_mes(lancamento, mes, mes_formatado)
     ]
 
     todas_frequencias = (
         db.query(FrequenciaMensal)
-        .filter(FrequenciaMensal.mes == mes)
+        .filter(
+            FrequenciaMensal.mes == mes,
+            FrequenciaMensal.funcionario_id.in_(funcionario_ids_ativos)
+        )
         .order_by(FrequenciaMensal.id.desc())
         .all()
     )

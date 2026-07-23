@@ -187,16 +187,18 @@ def render_lancamento(API_URL: str):
     except requests.exceptions.ConnectionError:
         funcionarios = []
 
-    if not funcionarios:
+    funcionarios_ativos = [f for f in funcionarios if f.get("ativo", True)]
+
+    if not funcionarios_ativos:
         st.warning("Cadastre pelo menos um funcionário antes de lançar a bonificação semanal.")
     else:
         if tipo_lancamento == "mensal":
-            _render_lancamento_mensal(API_URL, funcionarios)
+            _render_lancamento_mensal(API_URL, funcionarios_ativos)
             return
 
         mapa_funcionarios = {
             f"{f['nome']} - {f['cargo']} - {f.get('turno', 'Não informado')} - {_rotulo_tipo_entrega(f.get('tipo_entrega', 'Não se aplica'))} (ID {f['id']})": f
-            for f in funcionarios
+            for f in funcionarios_ativos
         }
 
         funcionario_label = st.selectbox(
