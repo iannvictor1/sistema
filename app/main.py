@@ -1222,12 +1222,23 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
         .all()
     )
 
+    todos_recebimentos_toneladas = [
+        recebimento for recebimento in (
+            db.query(RecebimentoToneladas)
+            .order_by(RecebimentoToneladas.id.desc())
+            .all()
+        )
+        if recebimento.status == "distribuido"
+        and lancamento_pertence_ao_mes(recebimento, mes, mes_formatado)
+    ]
+
     arquivo = exportar_fechamento_excel(
         mes=mes,
         fechamento=fechamento,
         lancamentos=todos_lancamentos,
         frequencias=todas_frequencias,
         funcionarios=funcionarios,
+        recebimentos_toneladas=todos_recebimentos_toneladas,
         base_url=str(request.base_url).rstrip("/")
     )
 

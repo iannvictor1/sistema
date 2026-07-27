@@ -1,10 +1,19 @@
+import json
 from io import BytesIO
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 
-def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, funcionarios, base_url: str = ""):
+def exportar_fechamento_excel(
+    mes: str,
+    fechamento,
+    lancamentos,
+    frequencias,
+    funcionarios,
+    recebimentos_toneladas=None,
+    base_url: str = "",
+):
     wb = Workbook()
 
     ws = wb.active
@@ -181,13 +190,45 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
     
     funcionarios_dict = {f.id: f.nome for f in funcionarios}
 
-    funcionarios_dict = {f.id: f.nome for f in funcionarios}
+    def chave_recebimento(item):
+        return (
+            getattr(item, "semana", None),
+            getattr(item, "data_lancamento", None),
+            round(float(getattr(item, "toneladas", 0) or 0), 3),
+            getattr(item, "numero_carregamento", None) or "",
+            getattr(item, "numero_nota_fiscal", None) or "",
+        )
+
+    def participantes_recebimento(recebimento):
+        try:
+            participantes = json.loads(getattr(recebimento, "participantes", None) or "[]")
+        except (TypeError, json.JSONDecodeError):
+            return set()
+        return set(participantes if isinstance(participantes, list) else [])
+
+    recebimentos_por_lancamento = {}
+    for recebimento in recebimentos_toneladas or []:
+        chave = chave_recebimento(recebimento)
+        for funcionario_id in participantes_recebimento(recebimento):
+            recebimentos_por_lancamento[(chave, funcionario_id)] = recebimento
+
+    def usuarios_lancamento(lancamento):
+        usuario_lancamento = getattr(lancamento, "usuario_lancamento", None) or "-"
+
+        if (getattr(lancamento, "tipo_lancamento", None) or "") != "recebimento_toneladas":
+            return usuario_lancamento, "-"
+
+        recebimento = recebimentos_por_lancamento.get(
+            (chave_recebimento(lancamento), getattr(lancamento, "funcionario_id", None))
+        )
+        usuario_original = getattr(recebimento, "usuario_lancamento", None) if recebimento else None
+        return usuario_original or "-", usuario_lancamento
 
     # =========================
     # Aba 2 - Lançamentos Semanais
     # =========================
     ws_lanc = wb.create_sheet("Lançamentos Semanais")
-    ws_lanc.merge_cells("A1:T1")
+    ws_lanc.merge_cells("A1:U1")
     ws_lanc["A1"] = "Detalhamento dos Lançamentos Semanais"
     ws_lanc["A1"].font = fonte_titulo
     ws_lanc["A1"].fill = fill_titulo
@@ -201,7 +242,8 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         "Tipo",
         "Data do Lançamento",
         "Data Escolhida",
-        "Usuário",
+        "Usuário que lançou",
+        "Usuário que escolheu",
         "Pedidos Separados",
         "Pedidos Carregados",
         "Toneladas",
@@ -235,40 +277,42 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_lanc.cell(linha, 5, tipo)
         ws_lanc.cell(linha, 6, getattr(l, "data_registro", None))
         ws_lanc.cell(linha, 7, getattr(l, "data_lancamento", None))
-        ws_lanc.cell(linha, 8, getattr(l, "usuario_lancamento", None) or "-")
-        ws_lanc.cell(linha, 9, l.pedidos_separados)
-        ws_lanc.cell(linha, 10, l.pedidos_carregados)
-        ws_lanc.cell(linha, 11, l.toneladas)
-        ws_lanc.cell(linha, 12, getattr(l, "numero_carregamento", None) or "-")
-        ws_lanc.cell(linha, 13, getattr(l, "numero_nota_fiscal", None) or "-")
+        usuario_que_lancou, usuario_que_escolheu = usuarios_lancamento(l)
+        ws_lanc.cell(linha, 8, usuario_que_lancou)
+        ws_lanc.cell(linha, 9, usuario_que_escolheu)
+        ws_lanc.cell(linha, 10, l.pedidos_separados)
+        ws_lanc.cell(linha, 11, l.pedidos_carregados)
+        ws_lanc.cell(linha, 12, l.toneladas)
+        ws_lanc.cell(linha, 13, getattr(l, "numero_carregamento", None) or "-")
+        ws_lanc.cell(linha, 14, getattr(l, "numero_nota_fiscal", None) or "-")
         if getattr(l, "nota_fiscal_pdf", None):
-            celula_pdf = ws_lanc.cell(linha, 14, "Abrir PDF")
+            celula_pdf = ws_lanc.cell(linha, 15, "Abrir PDF")
             if base_url:
                 celula_pdf.hyperlink = f"{base_url}/lancamentos-semanais/{l.id}/nota-fiscal"
                 celula_pdf.style = "Hyperlink"
         else:
-            ws_lanc.cell(linha, 14, "-")
-        ws_lanc.cell(linha, 15, l.entregas)
-        ws_lanc.cell(linha, 16, l.retornos)
-        ws_lanc.cell(linha, 17, l.nota)
-        ws_lanc.cell(linha, 18, "Sim" if l.penalidade else "Não")
-        ws_lanc.cell(linha, 19, l.motivo_penalidade if l.motivo_penalidade else "-")
-        ws_lanc.cell(linha, 20, l.bonus_calculado)
+            ws_lanc.cell(linha, 15, "-")
+        ws_lanc.cell(linha, 16, l.entregas)
+        ws_lanc.cell(linha, 17, l.retornos)
+        ws_lanc.cell(linha, 18, l.nota)
+        ws_lanc.cell(linha, 19, "Sim" if l.penalidade else "Não")
+        ws_lanc.cell(linha, 20, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_lanc.cell(linha, 21, l.bonus_calculado)
 
-        for col in range(1, 21):
+        for col in range(1, 22):
             ws_lanc.cell(linha, col).border = borda_fina
 
-        formatar_moeda(ws_lanc.cell(linha, 20))
+        formatar_moeda(ws_lanc.cell(linha, 21))
         linha += 1
 
     ws_lanc.freeze_panes = "A4"
-    ws_lanc.auto_filter.ref = f"A3:T{max(linha - 1, 3)}"
+    ws_lanc.auto_filter.ref = f"A3:U{max(linha - 1, 3)}"
 
     # =========================
     # Aba 3 - Lançamentos Diários
     # =========================
     ws_diario = wb.create_sheet("Lançamentos Diários")
-    ws_diario.merge_cells("A1:T1")
+    ws_diario.merge_cells("A1:U1")
     ws_diario["A1"] = "Detalhamento dos Lançamentos Diários"
     ws_diario["A1"].font = fonte_titulo
     ws_diario["A1"].fill = fill_titulo
@@ -293,34 +337,36 @@ def exportar_fechamento_excel(mes: str, fechamento, lancamentos, frequencias, fu
         ws_diario.cell(linha, 5, tipo)
         ws_diario.cell(linha, 6, getattr(l, "data_registro", None))
         ws_diario.cell(linha, 7, getattr(l, "data_lancamento", None))
-        ws_diario.cell(linha, 8, getattr(l, "usuario_lancamento", None) or "-")
-        ws_diario.cell(linha, 9, l.pedidos_separados)
-        ws_diario.cell(linha, 10, l.pedidos_carregados)
-        ws_diario.cell(linha, 11, l.toneladas)
-        ws_diario.cell(linha, 12, getattr(l, "numero_carregamento", None) or "-")
-        ws_diario.cell(linha, 13, getattr(l, "numero_nota_fiscal", None) or "-")
+        usuario_que_lancou, usuario_que_escolheu = usuarios_lancamento(l)
+        ws_diario.cell(linha, 8, usuario_que_lancou)
+        ws_diario.cell(linha, 9, usuario_que_escolheu)
+        ws_diario.cell(linha, 10, l.pedidos_separados)
+        ws_diario.cell(linha, 11, l.pedidos_carregados)
+        ws_diario.cell(linha, 12, l.toneladas)
+        ws_diario.cell(linha, 13, getattr(l, "numero_carregamento", None) or "-")
+        ws_diario.cell(linha, 14, getattr(l, "numero_nota_fiscal", None) or "-")
         if getattr(l, "nota_fiscal_pdf", None):
-            celula_pdf = ws_diario.cell(linha, 14, "Abrir PDF")
+            celula_pdf = ws_diario.cell(linha, 15, "Abrir PDF")
             if base_url:
                 celula_pdf.hyperlink = f"{base_url}/lancamentos-semanais/{l.id}/nota-fiscal"
                 celula_pdf.style = "Hyperlink"
         else:
-            ws_diario.cell(linha, 14, "-")
-        ws_diario.cell(linha, 15, l.entregas)
-        ws_diario.cell(linha, 16, l.retornos)
-        ws_diario.cell(linha, 17, l.nota)
-        ws_diario.cell(linha, 18, "Sim" if l.penalidade else "Não")
-        ws_diario.cell(linha, 19, l.motivo_penalidade if l.motivo_penalidade else "-")
-        ws_diario.cell(linha, 20, l.bonus_calculado)
+            ws_diario.cell(linha, 15, "-")
+        ws_diario.cell(linha, 16, l.entregas)
+        ws_diario.cell(linha, 17, l.retornos)
+        ws_diario.cell(linha, 18, l.nota)
+        ws_diario.cell(linha, 19, "Sim" if l.penalidade else "Não")
+        ws_diario.cell(linha, 20, l.motivo_penalidade if l.motivo_penalidade else "-")
+        ws_diario.cell(linha, 21, l.bonus_calculado)
 
-        for col in range(1, 21):
+        for col in range(1, 22):
             ws_diario.cell(linha, col).border = borda_fina
 
-        formatar_moeda(ws_diario.cell(linha, 20))
+        formatar_moeda(ws_diario.cell(linha, 21))
         linha += 1
 
     ws_diario.freeze_panes = "A4"
-    ws_diario.auto_filter.ref = f"A3:T{max(linha - 1, 3)}"
+    ws_diario.auto_filter.ref = f"A3:U{max(linha - 1, 3)}"
 
     # =========================
     # Aba 4 - Frequência Mensal (RESTAURADA)
