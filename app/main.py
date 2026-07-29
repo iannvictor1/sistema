@@ -279,6 +279,83 @@ def usuario_supervisor(usuario: str | None) -> bool:
     }
 
 
+def usuario_conferente(usuario: str | None) -> bool:
+    return normalizar_texto(usuario) in {"kayke", "ronilson"}
+
+
+def exigir_usuario_nao_conferente(usuario: str | None):
+    if usuario_conferente(usuario):
+        raise HTTPException(
+            status_code=403,
+            detail="Conferentes podem apenas confirmar os participantes do recebimento."
+        )
+
+
+def lancamento_corresponde_recebimento(lancamento: LancamentoSemanal, recebimento: RecebimentoToneladas) -> bool:
+    return (
+        normalizar_texto(lancamento.tipo_lancamento) == "recebimento_toneladas"
+        and lancamento.semana == recebimento.semana
+        and lancamento.data_lancamento == recebimento.data_lancamento
+        and float(lancamento.toneladas or 0) == float(recebimento.toneladas or 0)
+        and (lancamento.numero_carregamento or "") == (recebimento.numero_carregamento or "")
+        and (lancamento.numero_nota_fiscal or "") == (recebimento.numero_nota_fiscal or "")
+    )
+
+
+def lancamentos_do_recebimento(db: Session, recebimento: RecebimentoToneladas) -> list[LancamentoSemanal]:
+    lancamentos = (
+        db.query(LancamentoSemanal)
+        .filter(LancamentoSemanal.semana == recebimento.semana)
+        .all()
+    )
+    return [
+        lancamento for lancamento in lancamentos
+        if lancamento_corresponde_recebimento(lancamento, recebimento)
+    ]
+
+
+def criar_lancamento_de_recebimento(
+    db: Session,
+    recebimento: RecebimentoToneladas,
+    funcionario: Funcionario,
+    usuario: str | None,
+) -> LancamentoSemanal:
+    bonus = calcular_bonus(
+        tipo_entrega=funcionario.tipo_entrega,
+        pedidos_separados=0,
+        pedidos_carregados=0,
+        toneladas=recebimento.toneladas,
+        entregas=0,
+        retornos=0,
+        nota=5,
+        penalidade=False,
+        turno=funcionario.turno,
+    )
+    novo = LancamentoSemanal(
+        funcionario_id=funcionario.id,
+        semana=recebimento.semana,
+        tipo_lancamento="recebimento_toneladas",
+        data_lancamento=recebimento.data_lancamento,
+        data_registro=date.today(),
+        usuario_lancamento=usuario,
+        pedidos_separados=0,
+        pedidos_carregados=0,
+        toneladas=recebimento.toneladas,
+        numero_carregamento=recebimento.numero_carregamento,
+        numero_nota_fiscal=recebimento.numero_nota_fiscal,
+        nota_fiscal_pdf=recebimento.nota_fiscal_pdf,
+        nota_fiscal_pdf_nome=recebimento.nota_fiscal_pdf_nome,
+        entregas=0,
+        retornos=0,
+        nota=5,
+        penalidade=False,
+        motivo_penalidade=None,
+        bonus_calculado=bonus,
+    )
+    db.add(novo)
+    return novo
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -432,6 +509,7 @@ def criar_lancamento_semanal(
 ):
     tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
     usuario_lancamento = usuario_da_requisicao(lancamento.usuario_lancamento, request)
+    exigir_usuario_nao_conferente(usuario_lancamento)
     funcionario = (
         db.query(Funcionario)
         .filter(Funcionario.id == lancamento.funcionario_id)
@@ -530,6 +608,9 @@ def criar_recebimento_toneladas(
     request: Request,
     db: Session = Depends(get_db)
 ):
+    usuario_lancamento = usuario_da_requisicao(recebimento.usuario_lancamento, request)
+    exigir_usuario_nao_conferente(usuario_lancamento)
+
     if recebimento.toneladas <= 0:
         raise HTTPException(status_code=400, detail="Informe uma quantidade de toneladas maior que zero.")
 
@@ -537,7 +618,7 @@ def criar_recebimento_toneladas(
         semana=recebimento.semana,
         data_lancamento=recebimento.data_lancamento,
         data_registro=date.today(),
-        usuario_lancamento=usuario_da_requisicao(recebimento.usuario_lancamento, request),
+        usuario_lancamento=usuario_lancamento,
         toneladas=recebimento.toneladas,
         numero_carregamento=(recebimento.numero_carregamento or "").strip() or None,
         numero_nota_fiscal=(recebimento.numero_nota_fiscal or "").strip() or None,
@@ -558,6 +639,7 @@ def listar_recebimentos_toneladas(db: Session = Depends(get_db)):
 
 
 @app.post("/recebimentos-toneladas/{recebimento_id}/participantes", response_model=list[LancamentoSemanalResponse])
+@app.put("/recebimentos-toneladas/{recebimento_id}/participantes", response_model=list[LancamentoSemanalResponse])
 def confirmar_participantes_recebimento(
     recebimento_id: int,
     dados: RecebimentoParticipantesUpdate,
@@ -571,8 +653,6 @@ def confirmar_participantes_recebimento(
     )
     if not recebimento:
         raise HTTPException(status_code=404, detail="Recebimento nao encontrado.")
-    if recebimento.status == "distribuido":
-        raise HTTPException(status_code=400, detail="Este recebimento ja foi distribuido.")
 
     funcionario_ids = list(dict.fromkeys(dados.funcionario_ids))
     if not funcionario_ids:
@@ -587,42 +667,23 @@ def confirmar_participantes_recebimento(
         raise HTTPException(status_code=400, detail="Todos os participantes precisam ser funcionarios ativos.")
 
     usuario = usuario_da_requisicao(dados.usuario_lancamento, request)
-    criados = []
-    for funcionario in funcionarios:
-        bonus = calcular_bonus(
-            tipo_entrega=funcionario.tipo_entrega,
-            pedidos_separados=0,
-            pedidos_carregados=0,
-            toneladas=recebimento.toneladas,
-            entregas=0,
-            retornos=0,
-            nota=5,
-            penalidade=False,
-            turno=funcionario.turno,
-        )
-        novo = LancamentoSemanal(
-            funcionario_id=funcionario.id,
-            semana=recebimento.semana,
-            tipo_lancamento="recebimento_toneladas",
-            data_lancamento=recebimento.data_lancamento,
-            data_registro=date.today(),
-            usuario_lancamento=usuario,
-            pedidos_separados=0,
-            pedidos_carregados=0,
-            toneladas=recebimento.toneladas,
-            numero_carregamento=recebimento.numero_carregamento,
-            numero_nota_fiscal=recebimento.numero_nota_fiscal,
-            nota_fiscal_pdf=recebimento.nota_fiscal_pdf,
-            nota_fiscal_pdf_nome=recebimento.nota_fiscal_pdf_nome,
-            entregas=0,
-            retornos=0,
-            nota=5,
-            penalidade=False,
-            motivo_penalidade=None,
-            bonus_calculado=bonus,
-        )
-        db.add(novo)
-        criados.append(novo)
+    funcionario_por_id = {funcionario.id: funcionario for funcionario in funcionarios}
+    selecionados = set(funcionario_ids)
+    lancamentos_atuais = lancamentos_do_recebimento(db, recebimento)
+
+    for lancamento in lancamentos_atuais:
+        if lancamento.funcionario_id not in selecionados:
+            db.delete(lancamento)
+
+    existentes = {
+        lancamento.funcionario_id for lancamento in lancamentos_atuais
+        if lancamento.funcionario_id in selecionados
+    }
+    criados = [
+        criar_lancamento_de_recebimento(db, recebimento, funcionario_por_id[funcionario_id], usuario)
+        for funcionario_id in funcionario_ids
+        if funcionario_id not in existentes
+    ]
 
     recebimento.status = "distribuido"
     recebimento.participantes = json.dumps(funcionario_ids)
@@ -630,7 +691,12 @@ def confirmar_participantes_recebimento(
 
     for criado in criados:
         db.refresh(criado)
-    return criados
+
+    return sorted(
+        lancamentos_do_recebimento(db, recebimento),
+        key=lambda lancamento: lancamento.id,
+        reverse=True,
+    )
 
 
 @app.get("/lancamentos-semanais/{lancamento_id}/nota-fiscal")
@@ -681,6 +747,7 @@ def editar_lancamento_semanal(
 
     tipo_lancamento = normalizar_texto(lancamento.tipo_lancamento or "semanal")
     usuario_edicao = usuario_da_requisicao(None, request) or lancamento.usuario_lancamento
+    exigir_usuario_nao_conferente(usuario_edicao)
     if (
         tipo_lancamento in {"semanal", "diario"}
         and funcionario_recebe_por_toneladas(funcionario)
@@ -752,6 +819,9 @@ def criar_lancamento_mensal(
     request: Request,
     db: Session = Depends(get_db)
 ):
+    usuario_lancamento = usuario_da_requisicao(lancamento.usuario_lancamento, request)
+    exigir_usuario_nao_conferente(usuario_lancamento)
+
     turnos = turnos_do_filtro(lancamento.filtro_turno)
     funcionarios = (
         db.query(Funcionario)
@@ -796,7 +866,7 @@ def criar_lancamento_mensal(
             tipo_lancamento="mensal",
             data_lancamento=data_lancamento,
             data_registro=date.today(),
-            usuario_lancamento=usuario_da_requisicao(lancamento.usuario_lancamento, request),
+            usuario_lancamento=usuario_lancamento,
             pedidos_separados=lancamento.pedidos_separados,
             pedidos_carregados=lancamento.pedidos_carregados,
             toneladas=lancamento.toneladas,
@@ -821,8 +891,11 @@ def criar_lancamento_mensal(
 @app.delete("/lancamentos-semanais/{lancamento_id}")
 def excluir_lancamento_semanal(
     lancamento_id: int,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    exigir_usuario_nao_conferente(usuario_da_requisicao(None, request))
+
     lancamento = (
         db.query(LancamentoSemanal)
         .filter(LancamentoSemanal.id == lancamento_id)

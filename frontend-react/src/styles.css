@@ -481,6 +481,35 @@ select:focus {
   margin-top: 2px;
 }
 
+.receipt-participant-edit-form {
+  gap: 18px;
+}
+
+.receipt-participant-edit-form .participant-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.receipt-participant-actions {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 420px) minmax(130px, auto) minmax(210px, auto) 44px;
+}
+
+.receipt-participant-actions label {
+  color: var(--muted-strong);
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 7px;
+  min-width: 0;
+}
+
+.receipt-participant-actions button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
 .receipt-actions-menu {
   display: grid;
   gap: 8px;
@@ -1095,6 +1124,52 @@ td .icon-button + .icon-button {
   margin: 0;
 }
 
+.entry-edit-form {
+  gap: 16px;
+}
+
+.entry-edit-main-fields,
+.entry-edit-invoice-fields {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.entry-edit-invoice-fields label {
+  color: var(--muted-strong);
+  display: grid;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 7px;
+  min-width: 0;
+}
+
+.entry-edit-invoice-fields a {
+  align-self: end;
+  color: var(--brand-dark);
+  font-weight: 800;
+  min-height: 44px;
+  padding: 12px 0;
+  text-decoration: none;
+}
+
+.entry-edit-penalty-fields {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(160px, max-content) minmax(220px, 1fr);
+}
+
+.entry-edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.entry-edit-actions .primary {
+  min-width: min(290px, 100%);
+}
+
 :root[data-theme="dark"] .sidebar {
   background: var(--sidebar);
 }
@@ -1379,6 +1454,10 @@ td input[type="checkbox"] {
   .dashboard-filters,
   .advanced-filter-grid,
   .participant-grid,
+  .receipt-participant-actions,
+  .entry-edit-main-fields,
+  .entry-edit-invoice-fields,
+  .entry-edit-penalty-fields,
   .filter-grid {
     grid-template-columns: 1fr;
   }

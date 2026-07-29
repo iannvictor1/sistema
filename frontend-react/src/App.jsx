@@ -705,6 +705,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   const [receiptExtraEmployeeId, setReceiptExtraEmployeeId] = useState({});
   const employeeMap = useMemo(() => Object.fromEntries(employees.map((employee) => [employee.id, employee])), [employees]);
   const [editingEntry, setEditingEntry] = useState(null);
+  const [editingReceiptEntryId, setEditingReceiptEntryId] = useState(null);
   const [monthlyForm, setMonthlyForm] = useState({
     mes: currentMonthInput(),
     filtro_turno: "Manhã",
@@ -794,6 +795,40 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     ));
   }
 
+  function receiptParticipantIds(receipt) {
+    try {
+      const parsed = JSON.parse(receipt?.participantes || "[]");
+      return Array.isArray(parsed) ? parsed.map((id) => Number(id)).filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function sameReceiptField(first, second) {
+    return String(first || "") === String(second || "");
+  }
+
+  function receiptMatchesEntry(receipt, entry) {
+    return (
+      normalizeText(entry.tipo_lancamento) === "recebimento_toneladas" &&
+      normalizeText(receipt.status) === "distribuido" &&
+      receiptParticipantIds(receipt).includes(Number(entry.funcionario_id)) &&
+      receipt.semana === entry.semana &&
+      sameReceiptField(receipt.data_lancamento, entry.data_lancamento) &&
+      Number(receipt.toneladas || 0) === Number(entry.toneladas || 0) &&
+      sameReceiptField(receipt.numero_carregamento, entry.numero_carregamento) &&
+      sameReceiptField(receipt.numero_nota_fiscal, entry.numero_nota_fiscal)
+    );
+  }
+
+  function receiptForEntry(entry) {
+    return receipts.find((receipt) => receiptMatchesEntry(receipt, entry)) || null;
+  }
+
+  function participantStateForReceipt(receipt) {
+    return Object.fromEntries(receiptParticipantIds(receipt).map((id) => [id, true]));
+  }
+
   function toggleReceiptParticipant(receiptId, employeeId, selected) {
     setReceiptParticipants((current) => ({
       ...current,
@@ -848,6 +883,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   ));
   const canCreateSupervisorEntries = isSupervisorUser(loggedUser);
   const canChooseReceiptParticipants = isExpeditionUser(loggedUser);
+  const canManageEntries = !canChooseReceiptParticipants;
   const pendingReceipts = receipts.filter((receipt) => normalizeText(receipt.status) === "pendente");
   const showForm = mode !== "history";
   const showHistory = mode !== "form";
@@ -1130,24 +1166,81 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   }
 
   async function saveReceiptParticipants(receiptId) {
+    const receipt = receipts.find((item) => item.id === receiptId);
+    const isDistributed = normalizeText(receipt?.status) === "distribuido";
     const selectedIds = Object.entries(receiptParticipants[receiptId] || {})
       .filter(([, selected]) => selected)
       .map(([id]) => Number(id));
 
     if (!selectedIds.length) {
       setMessage("Selecione ao menos um participante do recebimento.");
-      return;
+      return false;
     }
 
     setMessage("");
     try {
-      const saved = await api.post(`/recebimentos-toneladas/${receiptId}/participantes`, {
+      const save = isDistributed ? api.put : api.post;
+      const saved = await save(`/recebimentos-toneladas/${receiptId}/participantes`, {
         funcionario_ids: selectedIds,
         usuario_lancamento: loggedUser || null,
       });
       await load();
       setReceiptParticipants((current) => ({ ...current, [receiptId]: {} }));
-      setMessage(`Recebimento distribuído para ${saved.length} participante(s).`);
+      setEditingReceiptEntryId(null);
+      setMessage(isDistributed
+        ? `Participantes atualizados para ${saved.length} participante(s).`
+        : `Recebimento distribuído para ${saved.length} participante(s).`
+      );
+      return true;
+    } catch (err) {
+      setMessage(errorMessage(err));
+      return false;
+    }
+  }
+
+  function editReceiptParticipants(entry) {
+    const receipt = receiptForEntry(entry);
+    if (!receipt) {
+      setMessage("Não encontrei o recebimento relacionado a este lançamento.");
+      return;
+    }
+
+    setEditingEntry(null);
+    setEditingReceiptEntryId(entry.id);
+    setReceiptParticipants((current) => ({
+      ...current,
+      [receipt.id]: participantStateForReceipt(receipt),
+    }));
+  }
+
+  async function removeReceiptParticipant(entry) {
+    const receipt = receiptForEntry(entry);
+    if (!receipt) {
+      setMessage("Não encontrei o recebimento relacionado a este lançamento.");
+      return;
+    }
+
+    const selectedIds = receiptParticipantIds(receipt).filter((id) => id !== Number(entry.funcionario_id));
+    if (!selectedIds.length) {
+      setMessage("O recebimento precisa ficar com ao menos um participante.");
+      return;
+    }
+
+    if (!confirm("Remover este participante do recebimento?")) return;
+
+    setReceiptParticipants((current) => ({
+      ...current,
+      [receipt.id]: Object.fromEntries(selectedIds.map((id) => [id, true])),
+    }));
+
+    setMessage("");
+    try {
+      const saved = await api.put(`/recebimentos-toneladas/${receipt.id}/participantes`, {
+        funcionario_ids: selectedIds,
+        usuario_lancamento: loggedUser || null,
+      });
+      await load();
+      setMessage(`Participante removido. Recebimento agora tem ${saved.length} participante(s).`);
     } catch (err) {
       setMessage(errorMessage(err));
     }
@@ -1222,41 +1315,102 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     }
 }
 
+  function renderReceiptParticipantEditForm(entry) {
+    const receipt = receiptForEntry(entry);
+    if (!receipt) return null;
+
+    return (
+      <form
+        className="inline-edit-form receipt-participant-edit-form"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          await saveReceiptParticipants(receipt.id);
+        }}
+      >
+        <h2>Editar participantes</h2>
+
+        <div className="participant-grid">
+          {receiptVisibleEmployees(receipt).map((employee) => (
+            <label className="check" key={employee.id}>
+              <input
+                checked={Boolean(receiptParticipants[receipt.id]?.[employee.id])}
+                type="checkbox"
+                onChange={(event) => toggleReceiptParticipant(receipt.id, employee.id, event.target.checked)}
+              />
+              {employee.nome}
+              {!isMorningEmployee(employee) && <small>{employee.turno}</small>}
+            </label>
+          ))}
+        </div>
+
+        <div className="receipt-participant-actions">
+          <label>
+            Adicionar funcionário
+            <select
+              value={receiptExtraEmployeeId[receipt.id] || ""}
+              onChange={(event) =>
+                setReceiptExtraEmployeeId((current) => ({
+                  ...current,
+                  [receipt.id]: event.target.value,
+                }))
+              }
+            >
+              <option value="">Selecione</option>
+              {receiptExtraEmployeeOptions(receipt).map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.nome} - {employee.turno || "Sem turno"}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button onClick={() => addReceiptExtraEmployee(receipt.id)} type="button">
+            <Plus size={17} /> Adicionar
+          </button>
+          <button className="primary" type="submit"><Save size={17} /> Salvar participantes</button>
+          <button className="icon-button" onClick={() => setEditingReceiptEntryId(null)} type="button">X</button>
+        </div>
+      </form>
+    );
+  }
+
   function renderEntryEditForm() {
     if (!editingEntry) return null;
     const editingIsEvaluation = normalizeText(editingEntry.tipo_lancamento) === "avaliacao_semanal";
 
     return (
-      <form className="inline-edit-form form-grid entries-form" onSubmit={updateEntry}>
+      <form className="inline-edit-form entry-edit-form" onSubmit={updateEntry}>
         <h2>Editar lançamento</h2>
 
-        <input value={editingEntry.semana} onChange={(event) => setEditingEntry({ ...editingEntry, semana: event.target.value })} required />
-        <input type="date" value={editingEntry.data_lancamento || ""} onChange={(event) => setEditingEntry({ ...editingEntry, data_lancamento: event.target.value })} />
+        <div className="entry-edit-main-fields">
+          <input value={editingEntry.semana} onChange={(event) => setEditingEntry({ ...editingEntry, semana: event.target.value })} required />
+          <input type="date" value={editingEntry.data_lancamento || ""} onChange={(event) => setEditingEntry({ ...editingEntry, data_lancamento: event.target.value })} />
 
-        {!editingIsEvaluation && bonusCriteria.map((criterion) => (
-          shouldShowCriterion(editingEntry, editingEmployeeTurn, editingEmployeeIsDelivery, criterion.id) && (
-            <input
-              key={criterion.id}
-              min="0"
-              step={criterion.step}
-              type={criterion.type}
-              placeholder={criterion.label}
-              value={editingEntry[criterion.id] || 0}
-              onChange={(event) => updateMetric(editingEntry, setEditingEntry, criterion.id, event.target.value)}
-            />
-          )
-        ))}
+          {!editingIsEvaluation && bonusCriteria.map((criterion) => (
+            shouldShowCriterion(editingEntry, editingEmployeeTurn, editingEmployeeIsDelivery, criterion.id) && (
+              <input
+                key={criterion.id}
+                min="0"
+                step={criterion.step}
+                type={criterion.type}
+                placeholder={criterion.label}
+                value={editingEntry[criterion.id] || 0}
+                onChange={(event) => updateMetric(editingEntry, setEditingEntry, criterion.id, event.target.value)}
+              />
+            )
+          ))}
 
-        {!editingIsEvaluation && (
-        <input
-          placeholder="N° carregamento"
-          value={editingEntry.numero_carregamento || ""}
-          onChange={(event) => setEditingEntry({ ...editingEntry, numero_carregamento: event.target.value })}
-        />
-        )}
+          {!editingIsEvaluation && (
+          <input
+            placeholder="N° carregamento"
+            value={editingEntry.numero_carregamento || ""}
+            onChange={(event) => setEditingEntry({ ...editingEntry, numero_carregamento: event.target.value })}
+          />
+          )}
+        </div>
 
         {!editingIsEvaluation && editingEmployeeReceivesTonnes && (
-          <>
+          <div className="entry-edit-invoice-fields">
             <input
               placeholder="Número da nota fiscal"
               value={editingEntry.numero_nota_fiscal || ""}
@@ -1275,7 +1429,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                 Abrir PDF atual
               </a>
             )}
-          </>
+          </div>
         )}
 
         {editingIsEvaluation && (
@@ -1285,14 +1439,16 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         )}
 
         {!editingIsEvaluation && (
-        <label className="check">
-          <input checked={editingEntry.penalidade} type="checkbox" onChange={(event) => setEditingEntry({ ...editingEntry, penalidade: event.target.checked })} />
-          Penalidade
-        </label>
-        )}
+        <div className="entry-edit-penalty-fields">
+          <label className="check">
+            <input checked={editingEntry.penalidade} type="checkbox" onChange={(event) => setEditingEntry({ ...editingEntry, penalidade: event.target.checked })} />
+            Penalidade
+          </label>
 
-        {editingEntry.penalidade && (
-          <input placeholder="Motivo" value={editingEntry.motivo_penalidade || ""} onChange={(event) => setEditingEntry({ ...editingEntry, motivo_penalidade: event.target.value })} required />
+          {editingEntry.penalidade && (
+            <input placeholder="Motivo" value={editingEntry.motivo_penalidade || ""} onChange={(event) => setEditingEntry({ ...editingEntry, motivo_penalidade: event.target.value })} required />
+          )}
+        </div>
         )}
 
         {!editingIsEvaluation && (
@@ -1317,8 +1473,10 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         </div>
         )}
 
-        <button className="primary" type="submit"><Save size={17} /> Salvar alterações</button>
-        <button className="icon-button" onClick={() => setEditingEntry(null)} type="button">X</button>
+        <div className="entry-edit-actions">
+          <button className="primary" type="submit"><Save size={17} /> Salvar alterações</button>
+          <button className="icon-button" onClick={() => setEditingEntry(null)} type="button">X</button>
+        </div>
       </form>
     );
   }
@@ -1327,6 +1485,8 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     <section className="view">
       {showForm && (
         <>
+          {canManageEntries && (
+          <>
           <div className="panel form-grid">
             <h2>Novo lançamento</h2>
             <select value={form.tipo_lancamento} onChange={(event) => changeEntryType(event.target.value)}>
@@ -1711,6 +1871,8 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
           </button>
             </form>
           )}
+          </>
+          )}
 
           {canChooseReceiptParticipants && (
             <section className="panel receipt-panel">
@@ -1907,27 +2069,57 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                             PDF
                           </a>
                         )}
-                        <button 
-                          className="icon-button"
-                          onClick={() => setEditingEntry({
-                            ...entry,
-                            ajustes_personalizados: customAdjustments(entry),
-                          })}
-                          title="Editar lançamento"
-                          type="button"
-                        >
-                          <Pencil size={16} />
-                        </button>
+                        {(canManageEntries || (canChooseReceiptParticipants && receiptForEntry(entry))) && (
+                          <>
+                            <button
+                              className="icon-button"
+                              onClick={() => {
+                                if (canManageEntries) {
+                                  setEditingReceiptEntryId(null);
+                                  setEditingEntry({
+                                    ...entry,
+                                    ajustes_personalizados: customAdjustments(entry),
+                                  });
+                                  return;
+                                }
 
-                        <button className="icon-button danger" onClick={() => removeEntry(entry.id)} title="Excluir lançamento" type="button">
-                          <Trash2 size={16} />
-                        </button>
+                                editReceiptParticipants(entry);
+                              }}
+                              title={canManageEntries ? "Editar lançamento" : "Editar participantes"}
+                              type="button"
+                            >
+                              <Pencil size={16} />
+                            </button>
+
+                            <button
+                              className="icon-button danger"
+                              onClick={() => {
+                                if (canManageEntries) {
+                                  removeEntry(entry.id);
+                                  return;
+                                }
+
+                                removeReceiptParticipant(entry);
+                              }}
+                              title={canManageEntries ? "Excluir lançamento" : "Remover participante"}
+                              type="button"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
 
                     {editingEntry?.id === entry.id && (
                       <tr className="inline-edit-row">
                         <td colSpan="10">{renderEntryEditForm()}</td>
+                      </tr>
+                    )}
+
+                    {editingReceiptEntryId === entry.id && (
+                      <tr className="inline-edit-row">
+                        <td colSpan="10">{renderReceiptParticipantEditForm(entry)}</td>
                       </tr>
                     )}
                   </Fragment>
