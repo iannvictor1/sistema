@@ -125,6 +125,20 @@ def fator_da_nota(nota: int | None) -> float:
     return fatores.get(nota, 0)
 
 
+def calcular_bonus_recebimento_toneladas(toneladas: float, nota: int = 5) -> float:
+    return calcular_bonus(
+        tipo_entrega="Nao se aplica",
+        pedidos_separados=0,
+        pedidos_carregados=0,
+        toneladas=toneladas or 0,
+        entregas=0,
+        retornos=0,
+        nota=nota,
+        penalidade=False,
+        turno="Manha",
+    )
+
+
 def carregar_ajustes_personalizados_lancamento(lancamento) -> list[dict]:
     itens = getattr(lancamento, "ajuste_personalizado_itens", None)
     if itens:
@@ -147,6 +161,9 @@ def carregar_ajustes_personalizados_lancamento(lancamento) -> list[dict]:
 
 
 def calcular_base_lancamento(lancamento, funcionario=None) -> float:
+    if normalizar_texto(getattr(lancamento, "tipo_lancamento", "")) == "recebimento_toneladas":
+        return calcular_bonus_recebimento_toneladas(getattr(lancamento, "toneladas", 0), nota=5)
+
     funcionario = funcionario or getattr(lancamento, "funcionario", None)
     tipo_entrega = getattr(funcionario, "tipo_entrega", "") if funcionario else ""
     turno = getattr(funcionario, "turno", "Nao informado") if funcionario else "Nao informado"

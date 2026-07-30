@@ -22,7 +22,7 @@ from .schemas import (
     DescontoFechamentoCreate,
     DescontoFechamentoResponse
 )
-from .calculos import calcular_bonus, calcular_bonus_mensal
+from .calculos import calcular_bonus, calcular_bonus_mensal, calcular_bonus_recebimento_toneladas
 from .export_excel import exportar_fechamento_excel
 from datetime import date
 from pathlib import Path
@@ -131,6 +131,18 @@ def garantir_colunas_lancamento():
 
 
 garantir_colunas_lancamento()
+
+
+def corrigir_bonus_recebimentos_toneladas():
+    with engine.begin() as conn:
+        conn.execute(text("""
+            UPDATE lancamentos_semanais
+            SET bonus_calculado = COALESCE(toneladas, 0) * 2
+            WHERE tipo_lancamento = 'recebimento_toneladas'
+        """))
+
+
+corrigir_bonus_recebimentos_toneladas()
 
 
 def carregar_ajustes_personalizados(itens: str | None, criterio: str | None = None, operacao: str | None = None):
@@ -320,17 +332,7 @@ def criar_lancamento_de_recebimento(
     funcionario: Funcionario,
     usuario: str | None,
 ) -> LancamentoSemanal:
-    bonus = calcular_bonus(
-        tipo_entrega=funcionario.tipo_entrega,
-        pedidos_separados=0,
-        pedidos_carregados=0,
-        toneladas=recebimento.toneladas,
-        entregas=0,
-        retornos=0,
-        nota=5,
-        penalidade=False,
-        turno=funcionario.turno,
-    )
+    bonus = calcular_bonus_recebimento_toneladas(recebimento.toneladas, nota=5)
     novo = LancamentoSemanal(
         funcionario_id=funcionario.id,
         semana=recebimento.semana,
