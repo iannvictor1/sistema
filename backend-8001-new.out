@@ -1,0 +1,12 @@
+INFO:     127.0.0.1:45581 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58574 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58574 - "GET /assets/index-el_Vajvc.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7669 - "GET /assets/index-CMxHZieG.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7669 - "GET /frequencias HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58798 - "GET /recebimentos-toneladas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58574 - "GET /lancamentos-semanais HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14069 - "GET /funcionarios HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60646 - "GET /recebimentos-toneladas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:26803 - "GET /frequencias HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43878 - "GET /funcionarios HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55326 - "GET /lancamentos-semanais HTTP/1.1" 200 OK

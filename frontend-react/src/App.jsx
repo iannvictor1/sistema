@@ -812,7 +812,6 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     return (
       normalizeText(entry.tipo_lancamento) === "recebimento_toneladas" &&
       normalizeText(receipt.status) === "distribuido" &&
-      receiptParticipantIds(receipt).includes(Number(entry.funcionario_id)) &&
       receipt.semana === entry.semana &&
       sameReceiptField(receipt.data_lancamento, entry.data_lancamento) &&
       Number(receipt.toneladas || 0) === Number(entry.toneladas || 0) &&
@@ -822,6 +821,14 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   }
 
   function receiptForEntry(entry) {
+    if (normalizeText(entry.tipo_lancamento) !== "recebimento_toneladas") return null;
+
+    const exactReceipt = receipts.find((receipt) => (
+      receiptMatchesEntry(receipt, entry) &&
+      receiptParticipantIds(receipt).includes(Number(entry.funcionario_id))
+    ));
+    if (exactReceipt) return exactReceipt;
+
     return receipts.find((receipt) => receiptMatchesEntry(receipt, entry)) || null;
   }
 
@@ -888,23 +895,46 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   const showForm = mode !== "history";
   const showHistory = mode !== "form";
 
+  function normalizeCriterionId(value) {
+    const normalized = normalizeText(value);
+    return bonusCriteria.find((criterion) => (
+      normalizeText(criterion.id) === normalized ||
+      normalizeText(criterion.label) === normalized
+    ))?.id || value;
+  }
+
+  function normalizeAdjustment(item) {
+    return {
+      criterio: normalizeCriterionId(item.criterio),
+      operacao: normalizeText(item.operacao) === "retirar" ? "retirar" : "adicionar",
+    };
+  }
+
   function customAdjustments(source) {
-    if (Array.isArray(source.ajustes_personalizados)) return source.ajustes_personalizados;
+    if (Array.isArray(source.ajustes_personalizados)) {
+      return source.ajustes_personalizados
+        .filter((item) => item?.criterio && item?.operacao)
+        .map(normalizeAdjustment);
+    }
 
     if (source.ajuste_personalizado_itens) {
       try {
         const parsed = JSON.parse(source.ajuste_personalizado_itens);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((item) => item?.criterio && item?.operacao)
+            .map(normalizeAdjustment);
+        }
       } catch {
         return [];
       }
     }
 
     if (source.ajuste_personalizado_descricao && source.ajuste_personalizado_operacao) {
-      return [{
+      return [normalizeAdjustment({
         criterio: source.ajuste_personalizado_descricao,
         operacao: source.ajuste_personalizado_operacao,
-      }];
+      })];
     }
 
     return [];
@@ -918,7 +948,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
 
   function hasCustomCriterion(source, criterion, operation) {
     return customAdjustments(source).some((item) => (
-      item.criterio === criterion && (!operation || item.operacao === operation)
+      normalizeCriterionId(item.criterio) === criterion && (!operation || item.operacao === operation)
     ));
   }
 
@@ -961,6 +991,10 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
 
   function updateMetric(source, setter, criterion, value) {
     setter({ ...source, [criterion]: value });
+  }
+
+  function metricInputValue(source, criterion) {
+    return source[criterion] ?? "";
   }
 
   function selectInvoicePdf(file, setter) {
@@ -1394,7 +1428,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                 step={criterion.step}
                 type={criterion.type}
                 placeholder={criterion.label}
-                value={editingEntry[criterion.id] || 0}
+                value={metricInputValue(editingEntry, criterion.id)}
                 onChange={(event) => updateMetric(editingEntry, setEditingEntry, criterion.id, event.target.value)}
               />
             )
@@ -2069,7 +2103,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                             PDF
                           </a>
                         )}
-                        {(canManageEntries || (canChooseReceiptParticipants && receiptForEntry(entry))) && (
+                        {(canManageEntries || (canChooseReceiptParticipants && normalizeText(entry.tipo_lancamento) === "recebimento_toneladas")) && (
                           <>
                             <button
                               className="icon-button"
