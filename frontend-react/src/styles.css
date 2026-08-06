@@ -757,6 +757,11 @@ table {
   table-layout: fixed;
 }
 
+.monthly-table {
+  min-width: 0;
+  table-layout: fixed;
+}
+
 .history-table {
   min-width: 1480px;
   table-layout: fixed;
@@ -885,6 +890,36 @@ table {
 .entries-table th:nth-child(8),
 .entries-table td:nth-child(8) {
   width: 105px;
+}
+
+.monthly-table th:nth-child(1),
+.monthly-table td:nth-child(1) {
+  width: 38%;
+}
+
+.monthly-table th:nth-child(2),
+.monthly-table td:nth-child(2) {
+  width: 32%;
+}
+
+.monthly-table th:nth-child(3),
+.monthly-table td:nth-child(3) {
+  width: 12%;
+}
+
+.monthly-table th:nth-child(4),
+.monthly-table td:nth-child(4) {
+  width: 18%;
+}
+
+.monthly-table td:nth-child(1),
+.monthly-table td:nth-child(2) {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.monthly-table td:nth-child(3) {
+  white-space: nowrap;
 }
 
 .history-table th:nth-child(1),
@@ -1029,7 +1064,11 @@ td {
   color: var(--text);
 }
 
-td:first-child,
+.employees-table td:first-child,
+.entries-table td:first-child,
+.history-table td:first-child,
+.frequency-table td:first-child,
+.closing-table td:first-child,
 .history-table td:nth-child(3),
 .history-table td:nth-child(4),
 .history-table td:nth-child(5),

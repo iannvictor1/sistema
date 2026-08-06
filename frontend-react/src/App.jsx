@@ -1867,7 +1867,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
           )}
 
           <div className="table-wrap" style={{ gridColumn: "1 / -1" }}>
-            <table className="entries-table">
+            <table className="monthly-table">
               <thead>
                 <tr><th>Funcionário</th><th>Cargo</th><th>Turno</th><th>Nota</th></tr>
               </thead>

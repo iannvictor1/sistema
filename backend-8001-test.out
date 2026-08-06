@@ -9,3 +9,11 @@ INFO:     127.0.0.1:14485 - "GET /recebimentos-toneladas HTTP/1.1" 200 OK
 INFO:     127.0.0.1:63333 - "GET /funcionarios HTTP/1.1" 200 OK
 INFO:     127.0.0.1:45098 - "GET /frequencias HTTP/1.1" 200 OK
 INFO:     127.0.0.1:60683 - "GET /lancamentos-semanais HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47845 - "GET /fechamento/2026-08 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57544 - "GET /fechamento/2026-08 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:21144 - "POST /lancamentos-mensais HTTP/1.1" 200 OK
+INFO:     127.0.0.1:21144 - "GET /funcionarios HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34734 - "GET /recebimentos-toneladas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:26084 - "GET /frequencias HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59662 - "GET /lancamentos-semanais HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34092 - "GET / HTTP/1.1" 200 OK
