@@ -1526,6 +1526,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
             <select value={form.tipo_lancamento} onChange={(event) => changeEntryType(event.target.value)}>
               <option value="semanal">Semanal</option>
               <option value="diario">Diário</option>
+              <option value="mensal">Mensal</option>
               {canCreateSupervisorEntries && <option value="recebimento_toneladas">Recebimento de toneladas</option>}
               {canCreateSupervisorEntries && <option value="avaliacao_semanal">Avaliação semanal</option>}
             </select>

@@ -1,0 +1,11 @@
+INFO:     127.0.0.1:26750 - "GET /funcionarios HTTP/1.1" 200 OK
+INFO:     127.0.0.1:26753 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:31493 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14485 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63333 - "GET /assets/index-CMxHZieG.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14485 - "GET /assets/index-Bp1QGoO_.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:16905 - "GET /logo.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14485 - "GET /recebimentos-toneladas HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63333 - "GET /funcionarios HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45098 - "GET /frequencias HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60683 - "GET /lancamentos-semanais HTTP/1.1" 200 OK
