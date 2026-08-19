@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -18,6 +19,7 @@ from .schemas import (
     LancamentoSemanalUpdate,
     RecebimentoToneladasCreate,
     RecebimentoToneladasResponse,
+    RecebimentoToneladasUpdate,
     RecebimentoParticipantesUpdate,
     DescontoFechamentoCreate,
     DescontoFechamentoResponse
@@ -32,6 +34,17 @@ import base64
 import binascii
 
 app = FastAPI(title="Sistema de Bonificação")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5175",
+        "http://localhost:5175",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIST = PROJECT_DIR / "frontend-react" / "dist"
@@ -638,6 +651,99 @@ def criar_recebimento_toneladas(
 @app.get("/recebimentos-toneladas", response_model=list[RecebimentoToneladasResponse])
 def listar_recebimentos_toneladas(db: Session = Depends(get_db)):
     return db.query(RecebimentoToneladas).order_by(RecebimentoToneladas.id.desc()).all()
+
+
+@app.put("/recebimentos-toneladas/{recebimento_id}", response_model=RecebimentoToneladasResponse)
+def editar_recebimento_toneladas(
+    recebimento_id: int,
+    dados: RecebimentoToneladasUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    recebimento = (
+        db.query(RecebimentoToneladas)
+        .filter(RecebimentoToneladas.id == recebimento_id)
+        .first()
+    )
+    if not recebimento:
+        raise HTTPException(status_code=404, detail="Recebimento nao encontrado.")
+
+    usuario_edicao = usuario_da_requisicao(None, request) or recebimento.usuario_lancamento
+    exigir_usuario_nao_conferente(usuario_edicao)
+
+    if dados.toneladas <= 0:
+        raise HTTPException(status_code=400, detail="Informe uma quantidade de toneladas maior que zero.")
+
+    lancamentos_atuais = lancamentos_do_recebimento(db, recebimento)
+    recebimento.semana = dados.semana
+    recebimento.data_lancamento = dados.data_lancamento
+    recebimento.toneladas = dados.toneladas
+    recebimento.numero_carregamento = (dados.numero_carregamento or "").strip() or None
+    recebimento.numero_nota_fiscal = (dados.numero_nota_fiscal or "").strip() or None
+    if dados.nota_fiscal_pdf:
+        recebimento.nota_fiscal_pdf = validar_pdf_nota_fiscal(dados.nota_fiscal_pdf)
+        recebimento.nota_fiscal_pdf_nome = (dados.nota_fiscal_pdf_nome or "").strip() or "nota-fiscal.pdf"
+
+    for lancamento in lancamentos_atuais:
+        lancamento.semana = recebimento.semana
+        lancamento.data_lancamento = recebimento.data_lancamento
+        lancamento.toneladas = recebimento.toneladas
+        lancamento.numero_carregamento = recebimento.numero_carregamento
+        lancamento.numero_nota_fiscal = recebimento.numero_nota_fiscal
+        lancamento.nota_fiscal_pdf = recebimento.nota_fiscal_pdf
+        lancamento.nota_fiscal_pdf_nome = recebimento.nota_fiscal_pdf_nome
+        lancamento.bonus_calculado = calcular_bonus_recebimento_toneladas(recebimento.toneladas, nota=5)
+
+    db.commit()
+    db.refresh(recebimento)
+    return recebimento
+
+
+@app.delete("/recebimentos-toneladas/{recebimento_id}")
+def excluir_recebimento_toneladas(
+    recebimento_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    recebimento = (
+        db.query(RecebimentoToneladas)
+        .filter(RecebimentoToneladas.id == recebimento_id)
+        .first()
+    )
+    if not recebimento:
+        raise HTTPException(status_code=404, detail="Recebimento nao encontrado.")
+
+    usuario_exclusao = usuario_da_requisicao(None, request) or recebimento.usuario_lancamento
+    exigir_usuario_nao_conferente(usuario_exclusao)
+
+    for lancamento in lancamentos_do_recebimento(db, recebimento):
+        db.delete(lancamento)
+
+    db.delete(recebimento)
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/recebimentos-toneladas/{recebimento_id}/nota-fiscal")
+def baixar_nota_fiscal_recebimento(recebimento_id: int, db: Session = Depends(get_db)):
+    recebimento = (
+        db.query(RecebimentoToneladas)
+        .filter(RecebimentoToneladas.id == recebimento_id)
+        .first()
+    )
+    if not recebimento or not recebimento.nota_fiscal_pdf:
+        raise HTTPException(status_code=404, detail="Nota fiscal nao encontrada.")
+
+    try:
+        conteudo = base64.b64decode(recebimento.nota_fiscal_pdf, validate=True)
+    except (ValueError, binascii.Error):
+        raise HTTPException(status_code=500, detail="O PDF armazenado esta invalido.")
+
+    return Response(
+        content=conteudo,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="nota-fiscal-recebimento-{recebimento.id}.pdf"'},
+    )
 
 
 @app.post("/recebimentos-toneladas/{recebimento_id}/participantes", response_model=list[LancamentoSemanalResponse])

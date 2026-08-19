@@ -128,6 +128,16 @@ class RecebimentoToneladasCreate(BaseModel):
     nota_fiscal_pdf_nome: str | None = None
 
 
+class RecebimentoToneladasUpdate(BaseModel):
+    semana: str
+    data_lancamento: Optional[date] = None
+    toneladas: float
+    numero_carregamento: str | None = None
+    numero_nota_fiscal: str | None = None
+    nota_fiscal_pdf: str | None = None
+    nota_fiscal_pdf_nome: str | None = None
+
+
 class RecebimentoToneladasResponse(BaseModel):
     id: int
     semana: str

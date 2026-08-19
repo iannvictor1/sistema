@@ -453,6 +453,13 @@ select:focus {
   min-width: 0;
 }
 
+.receipt-card-actions {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .receipt-card strong,
 .receipt-card span,
 .receipt-card small {
@@ -479,6 +486,17 @@ select:focus {
   color: var(--muted);
   font-size: 12px;
   margin-top: 2px;
+}
+
+.receipt-edit-form {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+}
+
+.receipt-edit-form h2,
+.receipt-edit-form .entry-edit-actions {
+  grid-column: 1 / -1;
 }
 
 .receipt-participant-edit-form {
@@ -763,7 +781,7 @@ table {
 }
 
 .history-table {
-  min-width: 1480px;
+  min-width: 1760px;
   table-layout: fixed;
 }
 
@@ -944,31 +962,41 @@ table {
 
 .history-table th:nth-child(5),
 .history-table td:nth-child(5) {
-  width: 72px;
+  width: 130px;
 }
 
 .history-table th:nth-child(6),
 .history-table td:nth-child(6) {
-  width: 155px;
+  width: 130px;
 }
 
 .history-table th:nth-child(7),
 .history-table td:nth-child(7) {
-  width: 145px;
+  width: 72px;
 }
 
 .history-table th:nth-child(8),
 .history-table td:nth-child(8) {
-  width: 180px;
+  width: 155px;
 }
 
 .history-table th:nth-child(9),
 .history-table td:nth-child(9) {
-  width: 135px;
+  width: 145px;
 }
 
 .history-table th:nth-child(10),
 .history-table td:nth-child(10) {
+  width: 180px;
+}
+
+.history-table th:nth-child(11),
+.history-table td:nth-child(11) {
+  width: 135px;
+}
+
+.history-table th:nth-child(12),
+.history-table td:nth-child(12) {
   width: 150px;
 }
 
@@ -1493,6 +1521,7 @@ td input[type="checkbox"] {
   .dashboard-filters,
   .advanced-filter-grid,
   .participant-grid,
+  .receipt-edit-form,
   .receipt-participant-actions,
   .entry-edit-main-fields,
   .entry-edit-invoice-fields,
