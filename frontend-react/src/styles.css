@@ -396,6 +396,18 @@ select:focus {
   box-shadow: 0 8px 18px rgba(18, 32, 44, 0.08);
 }
 
+.icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
+
+.icon-button:disabled:hover {
+  border-color: var(--line-strong);
+  box-shadow: none;
+  color: var(--muted-strong);
+}
+
 .icon-button.danger {
   color: var(--danger);
 }
@@ -562,6 +574,26 @@ select:focus {
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(150px, 1fr));
+}
+
+.frequency-filter-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.frequency-filter-panel .section-heading {
+  align-items: center;
+}
+
+.frequency-filters {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1.5fr) minmax(220px, 1fr) repeat(3, minmax(150px, 0.8fr));
+}
+
+.frequency-filters .search {
+  min-width: 0;
 }
 
 .dashboard-filters {
@@ -1070,6 +1102,13 @@ td {
   white-space: normal;
 }
 
+.empty-row {
+  color: var(--muted);
+  font-weight: 700;
+  padding: 24px 16px;
+  text-align: center;
+}
+
 th {
   background: var(--surface-soft);
   color: var(--muted-strong);
@@ -1526,6 +1565,7 @@ td input[type="checkbox"] {
   .entry-edit-main-fields,
   .entry-edit-invoice-fields,
   .entry-edit-penalty-fields,
+  .frequency-filters,
   .filter-grid {
     grid-template-columns: 1fr;
   }
@@ -1650,6 +1690,15 @@ td input[type="checkbox"] {
 
   .table-wrap .inline-edit-row > td::before {
     content: none;
+  }
+
+  .table-wrap .empty-row {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow-soft);
+    display: block;
+    width: 100%;
   }
 }
 

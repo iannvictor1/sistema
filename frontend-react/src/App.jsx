@@ -882,6 +882,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   const editingEmployee = editingEntry ? employeeMap[editingEntry.funcionario_id] : null;
   const editingEmployeeTurn = normalizeText(editingEmployee?.turno);
   const editingEmployeeIsDelivery = isDeliveryEmployee(editingEmployee);
+  const editingEntryIsReceipt = normalizeText(editingEntry?.tipo_lancamento) === "recebimento_toneladas";
   const selectedEmployeeReceivesTonnes = shouldShowCriterion(
     customEntryEnabled ? form : withoutCustomAdjustments(form),
     selectedEmployeeTurn,
@@ -895,7 +896,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     editingEmployeeTurn,
     editingEmployeeIsDelivery,
     "toneladas",
-  );
+  ) || editingEntryIsReceipt;
   const monthlyIsDelivery = normalizeText(monthlyForm.tipo_funcionario) === "entrega";
   const monthlyIsCommercialHours = normalizeText(monthlyForm.filtro_turno) === "horario comercial";
   const isReceiptEntry = form.tipo_lancamento === "recebimento_toneladas";
@@ -1371,6 +1372,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     event.preventDefault();
     setMessage("");
     const editingIsEvaluation = normalizeText(editingEntry.tipo_lancamento) === "avaliacao_semanal";
+    const editingIsReceipt = normalizeText(editingEntry.tipo_lancamento) === "recebimento_toneladas";
     const adjustments = normalizedCustomAdjustments(editingEntry);
     const firstAdjustment = adjustments[0] || {};
 
@@ -1380,7 +1382,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         data_lancamento: editingEntry.data_lancamento,
         pedidos_separados: editingIsEvaluation ? 0 : criterionValue(editingEntry, "pedidos_separados"),
         pedidos_carregados: editingIsEvaluation ? 0 : criterionValue(editingEntry, "pedidos_carregados"),
-        toneladas: editingIsEvaluation ? 0 : criterionValue(editingEntry, "toneladas", editingEmployeeIsDelivery && !isCriterionAdded(editingEntry, "toneladas")),
+        toneladas: editingIsEvaluation ? 0 : criterionValue(editingEntry, "toneladas", editingEmployeeIsDelivery && !editingIsReceipt && !isCriterionAdded(editingEntry, "toneladas")),
         numero_carregamento: editingIsEvaluation ? null : editingEntry.numero_carregamento || null,
         numero_nota_fiscal: !editingIsEvaluation && editingEmployeeReceivesTonnes ? editingEntry.numero_nota_fiscal || null : null,
         nota_fiscal_pdf: !editingIsEvaluation && editingEmployeeReceivesTonnes ? editingEntry.nota_fiscal_pdf || null : null,
@@ -1536,7 +1538,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
           <input type="date" value={editingEntry.data_lancamento || ""} onChange={(event) => setEditingEntry({ ...editingEntry, data_lancamento: event.target.value })} />
 
           {!editingIsEvaluation && bonusCriteria.map((criterion) => (
-            shouldShowCriterion(editingEntry, editingEmployeeTurn, editingEmployeeIsDelivery, criterion.id) && (
+            (criterion.id === "toneladas" && editingEntryIsReceipt ? true : shouldShowCriterion(editingEntry, editingEmployeeTurn, editingEmployeeIsDelivery, criterion.id)) && (
               <input
                 key={criterion.id}
                 min="0"
@@ -2335,6 +2337,51 @@ function Frequencies({ employees, frequencies, load }) {
   const activeEmployees = employees.filter((employee) => employee.ativo);
   const [message, setMessage] = useState("");
   const [editingFrequency, setEditingFrequency] = useState(null);
+  const [filters, setFilters] = useState({
+    search: "",
+    funcionario_id: "",
+    mes: "",
+    status_mes: "",
+    tipo_falta: "",
+  });
+  const filteredFrequencies = useMemo(() => {
+    const searchTerm = filters.search.trim().toLowerCase();
+
+    return frequencies.filter((frequency) => {
+      const employee = employeeMap[frequency.funcionario_id];
+      const employeeName = employee?.nome || "";
+      const type = frequency.tipo_falta || "";
+      const day = frequency.data_falta || "";
+
+      if (filters.funcionario_id && String(frequency.funcionario_id) !== filters.funcionario_id) return false;
+      if (filters.mes && frequency.mes !== filters.mes) return false;
+      if (filters.status_mes && frequency.status_mes !== filters.status_mes) return false;
+      if (filters.tipo_falta && type !== filters.tipo_falta) return false;
+
+      if (!searchTerm) return true;
+
+      return [
+        String(frequency.id),
+        employeeName,
+        frequency.mes,
+        frequency.status_mes,
+        String(frequency.ausencias),
+        day,
+        type,
+      ].some((value) => value.toLowerCase().includes(searchTerm));
+    });
+  }, [employeeMap, filters, frequencies]);
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+
+  function clearFilters() {
+    setFilters({
+      search: "",
+      funcionario_id: "",
+      mes: "",
+      status_mes: "",
+      tipo_falta: "",
+    });
+  }
 
   function frequencyPayload(source) {
     const hasAbsence = source.status_mes === "Normal" && source.houve_ausencia;
@@ -2489,13 +2536,56 @@ function Frequencies({ employees, frequencies, load }) {
 
       {message && <div className="alert">{message}</div>}
 
+      <section className="panel frequency-filter-panel">
+        <div className="section-heading">
+          <div>
+            <h2>Pesquisar lançamentos</h2>
+            <p>{filteredFrequencies.length} de {frequencies.length} lançamento(s)</p>
+          </div>
+          <button className="icon-button" disabled={!hasActiveFilters} onClick={clearFilters} title="Limpar filtros" type="button">
+            <CircleMinus size={17} />
+          </button>
+        </div>
+
+        <div className="frequency-filters">
+          <label className="search">
+            <Search size={17} />
+            <input
+              placeholder="Buscar por ID, funcionário, data ou tipo"
+              value={filters.search}
+              onChange={(event) => setFilters({ ...filters, search: event.target.value })}
+            />
+          </label>
+
+          <select value={filters.funcionario_id} onChange={(event) => setFilters({ ...filters, funcionario_id: event.target.value })}>
+            <option value="">Todos os funcionários</option>
+            {employees.map((employee) => <option key={employee.id} value={employee.id}>{employeeLabel(employee)}</option>)}
+          </select>
+
+          <input type="month" value={filters.mes} onChange={(event) => setFilters({ ...filters, mes: event.target.value })} />
+
+          <select value={filters.status_mes} onChange={(event) => setFilters({ ...filters, status_mes: event.target.value })}>
+            <option value="">Todos os status</option>
+            <option>Normal</option>
+            <option>Férias</option>
+          </select>
+
+          <select value={filters.tipo_falta} onChange={(event) => setFilters({ ...filters, tipo_falta: event.target.value })}>
+            <option value="">Todos os tipos</option>
+            <option>Falta</option>
+            <option>Atestado</option>
+            <option>Licença legal</option>
+          </select>
+        </div>
+      </section>
+
       <div className="table-wrap">
         <table className="frequency-table">
           <thead>
             <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th></th></tr>
           </thead>
           <tbody>
-            {frequencies.map((frequency) => (
+            {filteredFrequencies.map((frequency) => (
               <Fragment key={frequency.id}>
                 <tr>
                   <td data-label="ID">{frequency.id}</td>
@@ -2533,6 +2623,12 @@ function Frequencies({ employees, frequencies, load }) {
                 )}
               </Fragment>
             ))}
+
+            {!filteredFrequencies.length && (
+              <tr>
+                <td className="empty-row" colSpan="8">Nenhum lançamento encontrado.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
