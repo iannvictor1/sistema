@@ -305,7 +305,7 @@ def usuario_supervisor(usuario: str | None) -> bool:
 
 
 def usuario_conferente(usuario: str | None) -> bool:
-    return normalizar_texto(usuario) in {"kayke", "ronilson"}
+    return normalizar_texto(usuario) in {"kayke", "ronilson", "rafael"}
 
 
 def exigir_usuario_nao_conferente(usuario: str | None):

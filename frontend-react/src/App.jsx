@@ -733,7 +733,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   }
 
   function isExpeditionUser(user) {
-    return ["ronilson", "kayke"].includes(normalizeText(user));
+    return ["ronilson", "kayke", "rafael"].includes(normalizeText(user));
   }
 
   function entryTypeLabel(type) {
