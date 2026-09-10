@@ -372,7 +372,7 @@ def exportar_fechamento_excel(
     # Aba 4 - Frequência Mensal (RESTAURADA)
     # =========================
     ws_freq = wb.create_sheet("Frequência Mensal")
-    ws_freq.merge_cells("A1:H1")
+    ws_freq.merge_cells("A1:J1")
     ws_freq["A1"] = "Controle de Frequência Mensal"
     ws_freq["A1"].font = fonte_titulo
     ws_freq["A1"].fill = fill_titulo
@@ -386,7 +386,9 @@ def exportar_fechamento_excel(
     "Ausências",
     "Dia da Falta",
     "Tipo de Falta",
-    "Status do Mês"
+    "Status do Mês",
+    "Inicio das Ferias",
+    "Dias de Ferias"
 ]
 
     for i, valor in enumerate(headers_freq, start=1):
@@ -407,15 +409,17 @@ def exportar_fechamento_excel(
             8,
             getattr(f, "status_mes", "Normal")
         )
+        ws_freq.cell(linha, 9, getattr(f, "inicio_ferias", None))
+        ws_freq.cell(linha, 10, getattr(f, "dias_ferias", None) or 0)
         ws_freq.cell(linha, 7, getattr(f, "tipo_falta", None) or "-")
 
-        for col in range(1, 9):
+        for col in range(1, 11):
             ws_freq.cell(linha, col).border = borda_fina
 
         linha += 1
 
     ws_freq.freeze_panes = "A4"
-    ws_freq.auto_filter.ref = f"A3:H{max(linha - 1, 3)}"
+    ws_freq.auto_filter.ref = f"A3:J{max(linha - 1, 3)}"
 
     ws_func = wb.create_sheet("Funcionários")
     ws_func.merge_cells("A1:E1")

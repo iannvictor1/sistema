@@ -74,6 +74,50 @@ const bonusCriteria = [
   { id: "retornos", label: "Retornos", type: "number", step: "1" },
 ];
 
+const ASSIDUITY_VALUE = 150;
+const ASSIDUITY_BASE_DAYS = 30;
+
+function dateFromInput(value) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function vacationWorkedDays(month, startDate, vacationDays) {
+  const days = Number(vacationDays || 0);
+  const monthStart = dateFromInput(`${month}-01`);
+  const vacationStart = dateFromInput(startDate);
+
+  if (!monthStart || !vacationStart || days <= 0) return null;
+
+  const vacationEnd = new Date(vacationStart);
+  vacationEnd.setUTCDate(vacationEnd.getUTCDate() + days - 1);
+
+  let vacationDaysInMonth = 0;
+  for (let offset = 0; offset < ASSIDUITY_BASE_DAYS; offset += 1) {
+    const current = new Date(monthStart);
+    current.setUTCDate(current.getUTCDate() + offset);
+
+    if (current >= vacationStart && current <= vacationEnd) {
+      vacationDaysInMonth += 1;
+    }
+  }
+
+  if (vacationDaysInMonth === 0) return 0;
+  return Math.max(0, ASSIDUITY_BASE_DAYS - vacationDaysInMonth);
+}
+
+function vacationAssiduityPreview(source) {
+  const workedDays = vacationWorkedDays(source.mes, source.inicio_ferias, source.dias_ferias);
+  if (workedDays === null) return null;
+
+  return {
+    workedDays,
+    value: (ASSIDUITY_VALUE / ASSIDUITY_BASE_DAYS) * workedDays,
+  };
+}
+
 const USERS = {
   admin: "8599256",
   iann: "1234",
@@ -2333,6 +2377,8 @@ function Frequencies({ employees, frequencies, load }) {
     houve_ausencia: false,
     data_falta: todayInput(),
     tipo_falta: "Falta",
+    inicio_ferias: todayInput(),
+    dias_ferias: "",
   });
   const employeeMap = useMemo(() => Object.fromEntries(employees.map((employee) => [employee.id, employee])), [employees]);
   const activeEmployees = employees.filter((employee) => employee.ativo);
@@ -2369,6 +2415,8 @@ function Frequencies({ employees, frequencies, load }) {
         String(frequency.ausencias),
         day,
         type,
+        frequency.inicio_ferias || "",
+        String(frequency.dias_ferias || ""),
       ].some((value) => value.toLowerCase().includes(searchTerm));
     });
   }, [employeeMap, filters, frequencies]);
@@ -2386,6 +2434,7 @@ function Frequencies({ employees, frequencies, load }) {
 
   function frequencyPayload(source) {
     const hasAbsence = source.status_mes === "Normal" && source.houve_ausencia;
+    const hasVacation = source.status_mes === "Férias";
 
     return {
       funcionario_id: Number(source.funcionario_id),
@@ -2394,6 +2443,8 @@ function Frequencies({ employees, frequencies, load }) {
       data_falta: hasAbsence ? source.data_falta : null,
       tipo_falta: hasAbsence ? source.tipo_falta : null,
       status_mes: source.status_mes,
+      inicio_ferias: hasVacation ? source.inicio_ferias : null,
+      dias_ferias: hasVacation ? Number(source.dias_ferias || 0) : 0,
     };
   }
 
@@ -2417,6 +2468,8 @@ function Frequencies({ employees, frequencies, load }) {
       houve_ausencia: Number(frequency.ausencias || 0) > 0,
       data_falta: frequency.data_falta || todayInput(),
       tipo_falta: frequency.tipo_falta || "Falta",
+      inicio_ferias: frequency.inicio_ferias || todayInput(),
+      dias_ferias: frequency.dias_ferias || "",
     });
   }
 
@@ -2447,6 +2500,36 @@ function Frequencies({ employees, frequencies, load }) {
     }
   }
 
+  function renderVacationFields(source, onChange) {
+    const preview = vacationAssiduityPreview(source);
+
+    return (
+      <>
+        <input
+          type="date"
+          value={source.inicio_ferias}
+          onChange={(event) => onChange({ ...source, inicio_ferias: event.target.value })}
+          required
+        />
+        <input
+          min="1"
+          placeholder="Dias de férias"
+          step="1"
+          type="number"
+          value={source.dias_ferias}
+          onChange={(event) => onChange({ ...source, dias_ferias: event.target.value })}
+          required
+        />
+        {preview && (
+          <div className="vacation-preview">
+            <span>Dias trabalhados: <strong>{preview.workedDays}</strong></span>
+            <span>Assiduidade: <strong>{currency.format(preview.value)}</strong></span>
+          </div>
+        )}
+      </>
+    );
+  }
+
   function renderFrequencyEditForm() {
     if (!editingFrequency) return null;
 
@@ -2468,6 +2551,7 @@ function Frequencies({ employees, frequencies, load }) {
               ...editingFrequency,
               status_mes: event.target.value,
               houve_ausencia: event.target.value === "Normal" ? editingFrequency.houve_ausencia : false,
+              inicio_ferias: event.target.value === "Férias" && !editingFrequency.inicio_ferias ? todayInput() : editingFrequency.inicio_ferias,
             })
           }
         >
@@ -2495,6 +2579,8 @@ function Frequencies({ employees, frequencies, load }) {
           </>
         )}
 
+        {editingFrequency.status_mes === "Férias" && renderVacationFields(editingFrequency, setEditingFrequency)}
+
         <button className="primary" type="submit"><Save size={17} /> Salvar alterações</button>
         <button className="icon-button" onClick={() => setEditingFrequency(null)} type="button">X</button>
       </form>
@@ -2510,7 +2596,17 @@ function Frequencies({ employees, frequencies, load }) {
           {activeEmployees.map((employee) => <option key={employee.id} value={employee.id}>{employeeLabel(employee)}</option>)}
         </select>
         <input type="month" value={form.mes} onChange={(event) => setForm({ ...form, mes: event.target.value })} />
-        <select value={form.status_mes} onChange={(event) => setForm({ ...form, status_mes: event.target.value })}>
+        <select
+          value={form.status_mes}
+          onChange={(event) =>
+            setForm({
+              ...form,
+              status_mes: event.target.value,
+              houve_ausencia: event.target.value === "Normal" ? form.houve_ausencia : false,
+              inicio_ferias: event.target.value === "Férias" && !form.inicio_ferias ? todayInput() : form.inicio_ferias,
+            })
+          }
+        >
           <option>Normal</option>
           <option>Férias</option>
         </select>
@@ -2532,6 +2628,7 @@ function Frequencies({ employees, frequencies, load }) {
             )}
           </>
         )}
+        {form.status_mes === "Férias" && renderVacationFields(form, setForm)}
         <button className="primary" type="submit"><Save size={17} /> Salvar</button>
       </form>
 
@@ -2583,7 +2680,7 @@ function Frequencies({ employees, frequencies, load }) {
       <div className="table-wrap">
         <table className="frequency-table">
           <thead>
-            <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th></th></tr>
+            <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th>Início férias</th><th>Dias férias</th><th></th></tr>
           </thead>
           <tbody>
             {filteredFrequencies.map((frequency) => (
@@ -2596,6 +2693,8 @@ function Frequencies({ employees, frequencies, load }) {
                   <td data-label="Ausências">{frequency.ausencias}</td>
                   <td data-label="Dia">{frequency.data_falta || "-"}</td>
                   <td data-label="Tipo">{frequency.tipo_falta || "-"}</td>
+                  <td data-label="Início férias">{frequency.inicio_ferias || "-"}</td>
+                  <td data-label="Dias férias">{frequency.dias_ferias || "-"}</td>
                   <td className="row-actions" data-label="Ações">
                     <button
                       className="icon-button"
@@ -2619,7 +2718,7 @@ function Frequencies({ employees, frequencies, load }) {
 
                 {editingFrequency?.id === frequency.id && (
                   <tr className="inline-edit-row">
-                    <td colSpan="8">{renderFrequencyEditForm()}</td>
+                    <td colSpan="10">{renderFrequencyEditForm()}</td>
                   </tr>
                 )}
               </Fragment>
@@ -2627,7 +2726,7 @@ function Frequencies({ employees, frequencies, load }) {
 
             {!filteredFrequencies.length && (
               <tr>
-                <td className="empty-row" colSpan="8">Nenhum lançamento encontrado.</td>
+                <td className="empty-row" colSpan="10">Nenhum lançamento encontrado.</td>
               </tr>
             )}
           </tbody>
@@ -2807,8 +2906,8 @@ function Rules() {
     {
       title: "Assiduidade mensal",
       icon: CalendarCheck,
-      text: "Todo funcionário inicia o mês com o valor de assiduidade. Qualquer ausência registrada no mês remove esse valor.",
-      values: ["R$ 150,00 por mês", "Perde com 1 ausência"],
+      text: "Todo funcionário inicia o mês com o valor de assiduidade. Faltas removem o valor, e férias pagam proporcionalmente aos dias trabalhados.",
+      values: ["R$ 150,00 por mês", "Férias: R$ 150,00 / 30 x dias trabalhados"],
     },
     {
       title: "Regra por turno",

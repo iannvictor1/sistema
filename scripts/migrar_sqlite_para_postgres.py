@@ -54,7 +54,17 @@ TABLES = [
     {
         "name": "frequencias_mensais",
         "model": FrequenciaMensal,
-        "columns": ["id", "funcionario_id", "mes", "ausencias", "data_falta", "tipo_falta", "status_mes"],
+        "columns": [
+            "id",
+            "funcionario_id",
+            "mes",
+            "ausencias",
+            "data_falta",
+            "tipo_falta",
+            "status_mes",
+            "inicio_ferias",
+            "dias_ferias",
+        ],
     },
 ]
 

@@ -168,6 +168,8 @@ class FrequenciaMensalCreate(BaseModel):
     data_falta: Optional[date] = None
     tipo_falta: str | None = None
     status_mes: str = "Normal"
+    inicio_ferias: Optional[date] = None
+    dias_ferias: int | None = None
 
 
 class FrequenciaMensalResponse(BaseModel):
@@ -178,6 +180,8 @@ class FrequenciaMensalResponse(BaseModel):
     data_falta: Optional[date] = None
     tipo_falta: str | None = None
     status_mes: str = "Normal"
+    inicio_ferias: Optional[date] = None
+    dias_ferias: int | None = None
 
     class Config:
         from_attributes = True
