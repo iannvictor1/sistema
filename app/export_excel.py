@@ -53,7 +53,7 @@ def exportar_fechamento_excel(
             cell.border = borda_fina
 
     def estilizar_titulo(ws, titulo):
-        ws.merge_cells("A1:M1")
+        ws.merge_cells("A1:N1")
         ws["A1"] = titulo
         ws["A1"].font = fonte_titulo
         ws["A1"].fill = fill_titulo
@@ -98,6 +98,7 @@ def exportar_fechamento_excel(
         "Cargo",
         "Mês",
         "Ausências",
+        "Dias de Atestado",
         "Qtd. Lançamentos",
         "Elegível",
         "Assiduidade",
@@ -131,31 +132,32 @@ def exportar_fechamento_excel(
         ws_resumo.cell(linha_atual, 3, item["cargo"])
         ws_resumo.cell(linha_atual, 4, item["mes"])
         ws_resumo.cell(linha_atual, 5, item["ausencias"])
-        ws_resumo.cell(linha_atual, 6, item["quantidade_lancamentos"])
-        ws_resumo.cell(linha_atual, 7, elegivel)
-        ws_resumo.cell(linha_atual, 8, item["assiduidade"])
-        ws_resumo.cell(linha_atual, 9, item.get("nota_atual") or "-")
-        ws_resumo.cell(linha_atual, 10, bonus_lancamentos)
-        ws_resumo.cell(linha_atual, 11, item.get("desconto", 0))
-        ws_resumo.cell(linha_atual, 12, item.get("motivo_desconto") or "-")
-        ws_resumo.cell(linha_atual, 13, item["bonus_final"])
+        ws_resumo.cell(linha_atual, 6, item.get("dias_atestado", 0))
+        ws_resumo.cell(linha_atual, 7, item["quantidade_lancamentos"])
+        ws_resumo.cell(linha_atual, 8, elegivel)
+        ws_resumo.cell(linha_atual, 9, item["assiduidade"])
+        ws_resumo.cell(linha_atual, 10, item.get("nota_atual") or "-")
+        ws_resumo.cell(linha_atual, 11, bonus_lancamentos)
+        ws_resumo.cell(linha_atual, 12, item.get("desconto", 0))
+        ws_resumo.cell(linha_atual, 13, item.get("motivo_desconto") or "-")
+        ws_resumo.cell(linha_atual, 14, item["bonus_final"])
 
-        for col in range(1, 14):
+        for col in range(1, 15):
             ws_resumo.cell(linha_atual, col).border = borda_fina
-            ws_resumo.cell(linha_atual, col).alignment = alinhamento_centro if col not in {2, 3, 12} else alinhamento_esquerda
+            ws_resumo.cell(linha_atual, col).alignment = alinhamento_centro if col not in {2, 3, 13} else alinhamento_esquerda
             ws_resumo.cell(linha_atual, col).font = fonte_padrao
 
-        formatar_moeda(ws_resumo.cell(linha_atual, 8))
-        formatar_moeda(ws_resumo.cell(linha_atual, 10))
+        formatar_moeda(ws_resumo.cell(linha_atual, 9))
         formatar_moeda(ws_resumo.cell(linha_atual, 11))
-        formatar_moeda(ws_resumo.cell(linha_atual, 13))
+        formatar_moeda(ws_resumo.cell(linha_atual, 12))
+        formatar_moeda(ws_resumo.cell(linha_atual, 14))
 
         if item["elegivel"]:
-            for col in range(1, 14):
+            for col in range(1, 15):
                 ws_resumo.cell(linha_atual, col).fill = fill_elegivel
             total_elegiveis += 1
         else:
-            for col in range(1, 14):
+            for col in range(1, 15):
                 ws_resumo.cell(linha_atual, col).fill = fill_bloqueado
             total_bloqueados += 1
 
@@ -170,23 +172,23 @@ def exportar_fechamento_excel(
     ws_resumo.cell(linha_atual + 1, 7, "Bloqueados")
     ws_resumo.cell(linha_atual + 1, 8, total_bloqueados)
 
-    ws_resumo.cell(linha_atual + 2, 7, "Total Assiduidade")
-    ws_resumo.cell(linha_atual + 2, 8, total_assiduidade)
+    ws_resumo.cell(linha_atual + 2, 8, "Total Assiduidade")
+    ws_resumo.cell(linha_atual + 2, 9, total_assiduidade)
 
-    ws_resumo.cell(linha_atual + 3, 7, "Total Bônus")
-    ws_resumo.cell(linha_atual + 3, 8, total_bonus)
+    ws_resumo.cell(linha_atual + 3, 8, "Total Bônus")
+    ws_resumo.cell(linha_atual + 3, 9, total_bonus)
 
     for r in [linha_atual + 1, linha_atual + 2, linha_atual + 3]:
-        for c in range(1, 14):
+        for c in range(1, 15):
             ws_resumo.cell(r, c).border = borda_fina
             ws_resumo.cell(r, c).font = fonte_negrito
             ws_resumo.cell(r, c).fill = fill_total
 
-    formatar_moeda(ws_resumo.cell(linha_atual + 2, 8))
-    formatar_moeda(ws_resumo.cell(linha_atual + 3, 8))
+    formatar_moeda(ws_resumo.cell(linha_atual + 2, 9))
+    formatar_moeda(ws_resumo.cell(linha_atual + 3, 9))
 
     ws_resumo.freeze_panes = "A5"
-    ws_resumo.auto_filter.ref = f"A4:M{max(linha_atual - 1, 4)}"
+    ws_resumo.auto_filter.ref = f"A4:N{max(linha_atual - 1, 4)}"
     
     funcionarios_dict = {f.id: f.nome for f in funcionarios}
 
@@ -372,7 +374,7 @@ def exportar_fechamento_excel(
     # Aba 4 - Frequência Mensal (RESTAURADA)
     # =========================
     ws_freq = wb.create_sheet("Frequência Mensal")
-    ws_freq.merge_cells("A1:J1")
+    ws_freq.merge_cells("A1:K1")
     ws_freq["A1"] = "Controle de Frequência Mensal"
     ws_freq["A1"].font = fonte_titulo
     ws_freq["A1"].fill = fill_titulo
@@ -386,6 +388,7 @@ def exportar_fechamento_excel(
     "Ausências",
     "Dia da Falta",
     "Tipo de Falta",
+    "Dias de Atestado",
     "Status do Mês",
     "Inicio das Ferias",
     "Dias de Ferias"
@@ -404,22 +407,23 @@ def exportar_fechamento_excel(
         ws_freq.cell(linha, 4, f.mes)
         ws_freq.cell(linha, 5, f.ausencias)
         ws_freq.cell(linha, 6, getattr(f, "data_falta", None))
+        ws_freq.cell(linha, 7, getattr(f, "tipo_falta", None) or "-")
+        ws_freq.cell(linha, 8, getattr(f, "dias_atestado", None) or 0)
         ws_freq.cell(
             linha,
-            8,
+            9,
             getattr(f, "status_mes", "Normal")
         )
-        ws_freq.cell(linha, 9, getattr(f, "inicio_ferias", None))
-        ws_freq.cell(linha, 10, getattr(f, "dias_ferias", None) or 0)
-        ws_freq.cell(linha, 7, getattr(f, "tipo_falta", None) or "-")
+        ws_freq.cell(linha, 10, getattr(f, "inicio_ferias", None))
+        ws_freq.cell(linha, 11, getattr(f, "dias_ferias", None) or 0)
 
-        for col in range(1, 11):
+        for col in range(1, 12):
             ws_freq.cell(linha, col).border = borda_fina
 
         linha += 1
 
     ws_freq.freeze_panes = "A4"
-    ws_freq.auto_filter.ref = f"A3:J{max(linha - 1, 3)}"
+    ws_freq.auto_filter.ref = f"A3:K{max(linha - 1, 3)}"
 
     ws_func = wb.create_sheet("Funcionários")
     ws_func.merge_cells("A1:E1")

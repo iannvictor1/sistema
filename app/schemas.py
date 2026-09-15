@@ -167,6 +167,7 @@ class FrequenciaMensalCreate(BaseModel):
     ausencias: int
     data_falta: Optional[date] = None
     tipo_falta: str | None = None
+    dias_atestado: int | None = None
     status_mes: str = "Normal"
     inicio_ferias: Optional[date] = None
     dias_ferias: int | None = None
@@ -179,6 +180,7 @@ class FrequenciaMensalResponse(BaseModel):
     ausencias: int
     data_falta: Optional[date] = None
     tipo_falta: str | None = None
+    dias_atestado: int | None = None
     status_mes: str = "Normal"
     inicio_ferias: Optional[date] = None
     dias_ferias: int | None = None

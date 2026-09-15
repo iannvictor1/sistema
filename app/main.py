@@ -62,6 +62,7 @@ def garantir_colunas_frequencia():
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS status_mes TEXT DEFAULT 'Normal'"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS data_falta DATE"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS tipo_falta TEXT"))
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS dias_atestado INTEGER DEFAULT 0"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS inicio_ferias DATE"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS dias_ferias INTEGER DEFAULT 0"))
             return
@@ -80,6 +81,8 @@ def garantir_colunas_frequencia():
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN data_falta DATE"))
         if "tipo_falta" not in colunas:
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN tipo_falta TEXT"))
+        if "dias_atestado" not in colunas:
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN dias_atestado INTEGER DEFAULT 0"))
         if "inicio_ferias" not in colunas:
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN inicio_ferias DATE"))
         if "dias_ferias" not in colunas:
@@ -266,6 +269,14 @@ def resumir_frequencias(frequencias: list[FrequenciaMensal], mes: str) -> tuple[
         return 0, "Férias", calcular_dias_trabalhados_ferias(frequencias, mes)
 
     return 0, "Normal", DIAS_BASE_ASSIDUIDADE
+
+
+def total_dias_atestado(frequencias: list[FrequenciaMensal]) -> int:
+    return sum(
+        f.dias_atestado or 0
+        for f in frequencias
+        if f.tipo_falta == "Atestado"
+    )
 
 
 def nota_atual_lancamentos(lancamentos: list[LancamentoSemanal]) -> int | None:
@@ -1084,6 +1095,7 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         frequencia.ausencias = 0
         frequencia.data_falta = None
         frequencia.tipo_falta = None
+        frequencia.dias_atestado = 0
         if not frequencia.inicio_ferias:
             raise HTTPException(status_code=400, detail="Informe a data de inicio das ferias.")
         if not frequencia.dias_ferias or frequencia.dias_ferias <= 0:
@@ -1093,12 +1105,18 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
             raise HTTPException(status_code=400, detail="Informe o dia da falta.")
         if frequencia.tipo_falta not in tipos_falta_validos:
             raise HTTPException(status_code=400, detail="Informe um tipo de falta válido.")
+        if frequencia.tipo_falta == "Atestado":
+            if not frequencia.dias_atestado or frequencia.dias_atestado <= 0:
+                raise HTTPException(status_code=400, detail="Informe a quantidade de dias do atestado.")
+        else:
+            frequencia.dias_atestado = 0
         frequencia.mes = frequencia.data_falta.strftime("%Y-%m")
         frequencia.inicio_ferias = None
         frequencia.dias_ferias = 0
     else:
         frequencia.data_falta = None
         frequencia.tipo_falta = None
+        frequencia.dias_atestado = 0
         frequencia.inicio_ferias = None
         frequencia.dias_ferias = 0
 
@@ -1119,6 +1137,7 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         existente.status_mes = frequencia.status_mes
         existente.data_falta = frequencia.data_falta
         existente.tipo_falta = frequencia.tipo_falta
+        existente.dias_atestado = frequencia.dias_atestado or 0
         existente.inicio_ferias = frequencia.inicio_ferias
         existente.dias_ferias = frequencia.dias_ferias or 0
 
@@ -1132,6 +1151,7 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         ausencias=frequencia.ausencias,
         data_falta=frequencia.data_falta,
         tipo_falta=frequencia.tipo_falta,
+        dias_atestado=frequencia.dias_atestado or 0,
         status_mes=frequencia.status_mes,
         inicio_ferias=frequencia.inicio_ferias,
         dias_ferias=frequencia.dias_ferias or 0
@@ -1178,6 +1198,7 @@ def editar_frequencia(
         dados.ausencias = 0
         dados.data_falta = None
         dados.tipo_falta = None
+        dados.dias_atestado = 0
         if not dados.inicio_ferias:
             raise HTTPException(status_code=400, detail="Informe a data de inicio das ferias.")
         if not dados.dias_ferias or dados.dias_ferias <= 0:
@@ -1187,12 +1208,18 @@ def editar_frequencia(
             raise HTTPException(status_code=400, detail="Informe o dia da falta.")
         if dados.tipo_falta not in tipos_falta_validos:
             raise HTTPException(status_code=400, detail="Informe um tipo de falta válido.")
+        if dados.tipo_falta == "Atestado":
+            if not dados.dias_atestado or dados.dias_atestado <= 0:
+                raise HTTPException(status_code=400, detail="Informe a quantidade de dias do atestado.")
+        else:
+            dados.dias_atestado = 0
         dados.mes = dados.data_falta.strftime("%Y-%m")
         dados.inicio_ferias = None
         dados.dias_ferias = 0
     else:
         dados.data_falta = None
         dados.tipo_falta = None
+        dados.dias_atestado = 0
         dados.inicio_ferias = None
         dados.dias_ferias = 0
 
@@ -1203,6 +1230,7 @@ def editar_frequencia(
     frequencia.ausencias = dados.ausencias
     frequencia.data_falta = dados.data_falta
     frequencia.tipo_falta = dados.tipo_falta
+    frequencia.dias_atestado = dados.dias_atestado or 0
     frequencia.status_mes = dados.status_mes
     frequencia.inicio_ferias = dados.inicio_ferias
     frequencia.dias_ferias = dados.dias_ferias or 0
@@ -1328,6 +1356,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
         )
 
         ausencias, status_mes, dias_trabalhados = resumir_frequencias(frequencias, mes)
+        dias_atestado = total_dias_atestado(frequencias)
 
         lancamentos_funcionario = (
             db.query(LancamentoSemanal)
@@ -1371,6 +1400,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             "cargo": funcionario.cargo,
             "mes": mes,
             "ausencias": ausencias,
+            "dias_atestado": dias_atestado,
             "quantidade_lancamentos": len(lancamentos_producao),
             "nota_atual": nota_atual,
             "bonus_bruto": bonus_bruto,
@@ -1410,6 +1440,7 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
         )
 
         ausencias, status_mes, dias_trabalhados = resumir_frequencias(frequencias_funcionario, mes)
+        dias_atestado = total_dias_atestado(frequencias_funcionario)
 
         lancamentos_funcionario = (
             db.query(LancamentoSemanal)
@@ -1455,6 +1486,7 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
             "cargo": funcionario.cargo,
             "mes": mes,
             "ausencias": ausencias,
+            "dias_atestado": dias_atestado,
             "quantidade_lancamentos": len(lancamentos_producao),
             "nota_atual": nota_atual,
             "bonus_bruto": bonus_bruto,

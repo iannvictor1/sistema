@@ -2377,6 +2377,7 @@ function Frequencies({ employees, frequencies, load }) {
     houve_ausencia: false,
     data_falta: todayInput(),
     tipo_falta: "Falta",
+    dias_atestado: "",
     inicio_ferias: todayInput(),
     dias_ferias: "",
   });
@@ -2415,6 +2416,7 @@ function Frequencies({ employees, frequencies, load }) {
         String(frequency.ausencias),
         day,
         type,
+        String(frequency.dias_atestado || ""),
         frequency.inicio_ferias || "",
         String(frequency.dias_ferias || ""),
       ].some((value) => value.toLowerCase().includes(searchTerm));
@@ -2442,6 +2444,7 @@ function Frequencies({ employees, frequencies, load }) {
       ausencias: hasAbsence ? 1 : 0,
       data_falta: hasAbsence ? source.data_falta : null,
       tipo_falta: hasAbsence ? source.tipo_falta : null,
+      dias_atestado: hasAbsence && source.tipo_falta === "Atestado" ? Number(source.dias_atestado || 0) : 0,
       status_mes: source.status_mes,
       inicio_ferias: hasVacation ? source.inicio_ferias : null,
       dias_ferias: hasVacation ? Number(source.dias_ferias || 0) : 0,
@@ -2468,6 +2471,7 @@ function Frequencies({ employees, frequencies, load }) {
       houve_ausencia: Number(frequency.ausencias || 0) > 0,
       data_falta: frequency.data_falta || todayInput(),
       tipo_falta: frequency.tipo_falta || "Falta",
+      dias_atestado: frequency.dias_atestado || "",
       inicio_ferias: frequency.inicio_ferias || todayInput(),
       dias_ferias: frequency.dias_ferias || "",
     });
@@ -2574,6 +2578,17 @@ function Frequencies({ employees, frequencies, load }) {
                   <option>Atestado</option>
                   <option>Licença legal</option>
                 </select>
+                {editingFrequency.tipo_falta === "Atestado" && (
+                  <input
+                    min="1"
+                    placeholder="Dias de atestado"
+                    step="1"
+                    type="number"
+                    value={editingFrequency.dias_atestado}
+                    onChange={(event) => setEditingFrequency({ ...editingFrequency, dias_atestado: event.target.value })}
+                    required
+                  />
+                )}
               </>
             )}
           </>
@@ -2624,6 +2639,17 @@ function Frequencies({ employees, frequencies, load }) {
                   <option>Atestado</option>
                   <option>Licença legal</option>
                 </select>
+                {form.tipo_falta === "Atestado" && (
+                  <input
+                    min="1"
+                    placeholder="Dias de atestado"
+                    step="1"
+                    type="number"
+                    value={form.dias_atestado}
+                    onChange={(event) => setForm({ ...form, dias_atestado: event.target.value })}
+                    required
+                  />
+                )}
               </>
             )}
           </>
@@ -2680,7 +2706,7 @@ function Frequencies({ employees, frequencies, load }) {
       <div className="table-wrap">
         <table className="frequency-table">
           <thead>
-            <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th>Início férias</th><th>Dias férias</th><th></th></tr>
+            <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th>Dias atestado</th><th>Início férias</th><th>Dias férias</th><th></th></tr>
           </thead>
           <tbody>
             {filteredFrequencies.map((frequency) => (
@@ -2693,6 +2719,7 @@ function Frequencies({ employees, frequencies, load }) {
                   <td data-label="Ausências">{frequency.ausencias}</td>
                   <td data-label="Dia">{frequency.data_falta || "-"}</td>
                   <td data-label="Tipo">{frequency.tipo_falta || "-"}</td>
+                  <td data-label="Dias atestado">{frequency.dias_atestado || "-"}</td>
                   <td data-label="Início férias">{frequency.inicio_ferias || "-"}</td>
                   <td data-label="Dias férias">{frequency.dias_ferias || "-"}</td>
                   <td className="row-actions" data-label="Ações">
@@ -2718,7 +2745,7 @@ function Frequencies({ employees, frequencies, load }) {
 
                 {editingFrequency?.id === frequency.id && (
                   <tr className="inline-edit-row">
-                    <td colSpan="10">{renderFrequencyEditForm()}</td>
+                    <td colSpan="11">{renderFrequencyEditForm()}</td>
                   </tr>
                 )}
               </Fragment>
@@ -2726,7 +2753,7 @@ function Frequencies({ employees, frequencies, load }) {
 
             {!filteredFrequencies.length && (
               <tr>
-                <td className="empty-row" colSpan="10">Nenhum lançamento encontrado.</td>
+                <td className="empty-row" colSpan="11">Nenhum lançamento encontrado.</td>
               </tr>
             )}
           </tbody>
@@ -2826,7 +2853,7 @@ function Closing() {
       <div className="table-wrap closing-table-wrap">
         <table className="closing-table">
           <thead>
-            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Nota atual</th><th>Ausências</th><th>Lançamentos</th><th>Assiduidade</th><th>Desconto</th><th>Bônus final</th><th></th></tr>
+            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Nota atual</th><th>Ausências</th><th>Dias atestado</th><th>Lançamentos</th><th>Assiduidade</th><th>Desconto</th><th>Bônus final</th><th></th></tr>
           </thead>
           <tbody>
             {closing.map((item) => (
@@ -2837,6 +2864,7 @@ function Closing() {
                   <td data-label="Status"><span className={item.elegivel ? "badge ok" : "badge danger"}>{item.status_mes === "Férias" ? "Férias" : item.elegivel ? "Elegível" : "Bloqueado"}</span></td>
                   <td data-label="Nota atual">{item.nota_atual ?? "-"}</td>
                   <td data-label="Ausências">{item.ausencias}</td>
+                  <td data-label="Dias atestado">{item.dias_atestado || "-"}</td>
                   <td data-label="Lançamentos">{item.quantidade_lancamentos}</td>
                   <td data-label="Assiduidade">{currency.format(Number(item.assiduidade || 0))}</td>
                   <td data-label="Desconto" title={item.motivo_desconto || ""}>{currency.format(Number(item.desconto || 0))}</td>
@@ -2862,7 +2890,7 @@ function Closing() {
 
                 {editingDiscount?.funcionario_id === item.funcionario_id && (
                   <tr className="inline-edit-row">
-                    <td colSpan="10">
+                    <td colSpan="11">
                       <form className="inline-edit-form discount-form" onSubmit={saveDiscount}>
                         <h2>Desconto de {editingDiscount.funcionario}</h2>
                         <label>

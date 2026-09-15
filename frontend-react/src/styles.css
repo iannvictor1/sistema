@@ -877,7 +877,7 @@ table {
 }
 
 .frequency-table {
-  min-width: 1080px;
+  min-width: 1200px;
   table-layout: fixed;
 }
 
@@ -923,11 +923,16 @@ table {
 
 .frequency-table th:nth-child(9),
 .frequency-table td:nth-child(9) {
-  width: 120px;
+  width: 140px;
 }
 
 .frequency-table th:nth-child(10),
 .frequency-table td:nth-child(10) {
+  width: 120px;
+}
+
+.frequency-table th:nth-child(11),
+.frequency-table td:nth-child(11) {
   width: 118px;
 }
 
@@ -1178,7 +1183,8 @@ td {
 .frequency-table td:nth-child(7),
 .frequency-table td:nth-child(8),
 .frequency-table td:nth-child(9),
-.frequency-table td:nth-child(10) {
+.frequency-table td:nth-child(10),
+.frequency-table td:nth-child(11) {
   white-space: nowrap;
 }
 
