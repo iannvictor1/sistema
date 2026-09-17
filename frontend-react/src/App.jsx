@@ -129,7 +129,8 @@ const USERS = {
   kayke: "Cemkayke123@",
   junior: "Cemjunior123@",
   rafael: "Cemrafa123@",
-  amanda: "Cemamanda123@"
+  amanda: "Cemamanda123@",
+  iago: "Cemiago123@"
 };
 
 function readLoggedUser() {
