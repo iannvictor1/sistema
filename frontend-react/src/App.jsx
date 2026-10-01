@@ -775,7 +775,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   }
 
   function isSupervisorUser(user) {
-    return ["admin", "iann", "valesca", "paulo", "romario", "gabriel", "junior"].includes(normalizeText(user));
+    return ["admin", "iann", "valesca", "paulo", "romario", "gabriel", "junior", "iago"].includes(normalizeText(user));
   }
 
   function isExpeditionUser(user) {
