@@ -361,6 +361,7 @@ def usuario_supervisor(usuario: str | None) -> bool:
         "romario",
         "gabriel",
         "junior",
+        "iago",
     }
 
 
