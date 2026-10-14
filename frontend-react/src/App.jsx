@@ -74,6 +74,34 @@ const bonusCriteria = [
   { id: "retornos", label: "Retornos", type: "number", step: "1" },
 ];
 
+// Espelha CRITERIOS_AVALIACAO_TURNO_AB / _C em app/calculos.py.
+const evaluationCriteriaShiftAB = [
+  { id: "acuracidade_estoque", label: "Inventário / acuracidade do estoque" },
+  { id: "recebimento", label: "Recebimento" },
+  { id: "perdas_avarias", label: "Perdas por avarias ou validade" },
+  { id: "comportamental", label: "Comportamental" },
+  { id: "produtividade", label: "Produtividade" },
+];
+
+const evaluationCriteriaShiftC = [
+  { id: "sistemas_processos", label: "Sistemas e processos" },
+  { id: "comportamental", label: "Comportamental" },
+  { id: "acuracidade_estoque", label: "Acuracidade do estoque" },
+  { id: "verificacao_nfs", label: "Verificação das informações e observações nas NFs" },
+  { id: "produtividade", label: "Produtividade" },
+];
+
+const EVALUATION_MIN_POINTS = 18;
+
+function evaluationCriteriaForTurn(turn) {
+  const normalized = String(turn || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+  return normalized === "noite" ? evaluationCriteriaShiftC : evaluationCriteriaShiftAB;
+}
+
+function evaluationCriterionLabel(criterionId) {
+  return [...evaluationCriteriaShiftAB, ...evaluationCriteriaShiftC].find((item) => item.id === criterionId)?.label || criterionId;
+}
+
 const ASSIDUITY_VALUE = 150;
 const ASSIDUITY_BASE_DAYS = 30;
 
@@ -728,6 +756,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     entregas: 0,
     retornos: 0,
     nota: 3,
+    criterio_avaliacao: "",
     penalidade: false,
     motivo_penalidade: "",
     ajuste_operacao: "adicionar",
@@ -787,7 +816,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
       diario: "Diário",
       semanal: "Semanal",
       mensal: "Mensal",
-      avaliacao_semanal: "Avaliação semanal",
+      avaliacao_semanal: "Lançamento de nota",
       recebimento_toneladas: "Recebimento toneladas",
     };
     return labels[normalizeText(type)] || type || "-";
@@ -1191,6 +1220,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
       nota_fiscal_pdf: showInvoiceFields ? form.nota_fiscal_pdf || null : null,
       nota_fiscal_pdf_nome: showInvoiceFields ? form.nota_fiscal_pdf_nome || null : null,
       nota: isEvaluationEntry ? Number(form.nota) : 5,
+      criterio_avaliacao: isEvaluationEntry ? form.criterio_avaliacao || null : null,
       penalidade: isEvaluationEntry ? false : form.penalidade,
       motivo_penalidade: !isEvaluationEntry && form.penalidade ? form.motivo_penalidade : null,
       ajuste_personalizado_descricao: isEvaluationEntry ? null : firstAdjustment.criterio || null,
@@ -1218,7 +1248,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         nota_fiscal_pdf_nome: null,
         ajustes_personalizados: [{ criterio: "pedidos_separados", operacao: "adicionar" }],
       }));
-      setMessage(isEvaluationEntry ? "Avaliação semanal salva." : `Lançamento salvo. Bônus: ${currency.format(Number(saved.bonus_calculado || 0))}`);
+      setMessage(isEvaluationEntry ? "Nota salva." : `Lançamento salvo. Bônus: ${currency.format(Number(saved.bonus_calculado || 0))}`);
     } catch (err) {
       setMessage(errorMessage(err));
     }
@@ -1436,6 +1466,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         entregas: editingIsEvaluation ? 0 : criterionValue(editingEntry, "entregas"),
         retornos: editingIsEvaluation ? 0 : criterionValue(editingEntry, "retornos"),
         nota: editingIsEvaluation ? Number(editingEntry.nota) : 5,
+        criterio_avaliacao: editingIsEvaluation ? editingEntry.criterio_avaliacao || null : null,
         penalidade: editingIsEvaluation ? false : Boolean(editingEntry.penalidade),
         motivo_penalidade: !editingIsEvaluation && editingEntry.penalidade
         ? editingEntry.motivo_penalidade
@@ -1630,9 +1661,21 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         )}
 
         {editingIsEvaluation && (
+        <>
+        <select
+          value={editingEntry.criterio_avaliacao || ""}
+          onChange={(event) => setEditingEntry({ ...editingEntry, criterio_avaliacao: event.target.value })}
+          required
+        >
+          <option value="">Tipo da nota</option>
+          {evaluationCriteriaForTurn(editingEmployee?.turno).map((item) => (
+            <option key={item.id} value={item.id}>{item.label}</option>
+          ))}
+        </select>
         <select value={editingEntry.nota} onChange={(event) => setEditingEntry({ ...editingEntry, nota: event.target.value })}>
           {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
         </select>
+        </>
         )}
 
         {!editingIsEvaluation && (
@@ -1691,7 +1734,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
               <option value="diario">Diário</option>
               <option value="mensal">Mensal</option>
               {canCreateSupervisorEntries && <option value="recebimento_toneladas">Recebimento de toneladas</option>}
-              {canCreateSupervisorEntries && <option value="avaliacao_semanal">Avaliação semanal</option>}
+              {canCreateSupervisorEntries && <option value="avaliacao_semanal">Lançamento de nota</option>}
             </select>
           </div>
 
@@ -1778,6 +1821,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
               setForm({
                 ...form,
                 funcionario_id: event.target.value,
+                criterio_avaliacao: "",
                 pedidos_separados: 0,
                 pedidos_carregados: 0,
                 toneladas: 0,
@@ -1873,9 +1917,22 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
             </>
           )}
           {isEvaluationEntry && (
+          <>
+          <select
+            disabled={!selectedEmployee}
+            value={form.criterio_avaliacao}
+            onChange={(event) => setForm({ ...form, criterio_avaliacao: event.target.value })}
+            required
+          >
+            <option value="">{selectedEmployee ? "Tipo da nota" : "Escolha o funcionário"}</option>
+            {selectedEmployee && evaluationCriteriaForTurn(selectedEmployee.turno).map((item) => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </select>
           <select value={form.nota} onChange={(event) => setForm({ ...form, nota: event.target.value })}>
             {[1, 2, 3, 4, 5].map((note) => <option key={note}>{note}</option>)}
           </select>
+          </>
           )}
           {!isEvaluationEntry && !isReceiptEntry && (
           <label className="check">
@@ -2229,7 +2286,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                 <option value="semanal">Semanal</option>
                 <option value="mensal">Mensal</option>
                 <option value="recebimento_toneladas">Recebimento toneladas</option>
-                <option value="avaliacao_semanal">Avaliação semanal</option>
+                <option value="avaliacao_semanal">Lançamento de nota</option>
               </select>
             </label>
 
@@ -2284,7 +2341,11 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                       <td data-label="Semana">{entry.semana}</td>
                       <td data-label="Lançou">{userInfo.launchedBy}</td>
                       <td data-label="Escolheu">{userInfo.chosenBy}</td>
-                      <td data-label="Nota">{normalizeText(entry.tipo_lancamento) === "avaliacao_semanal" ? entry.nota : "-"}</td>
+                      <td data-label="Nota">
+                        {normalizeText(entry.tipo_lancamento) === "avaliacao_semanal"
+                          ? entry.criterio_avaliacao ? `${evaluationCriterionLabel(entry.criterio_avaliacao)}: ${entry.nota}` : entry.nota
+                          : "-"}
+                      </td>
                       <td data-label="N° carregamento">{entry.numero_carregamento || "-"}</td>
                       <td data-label="Nota fiscal">{entry.numero_nota_fiscal || "-"}</td>
                       <td className="adjustment-cell" data-label="Ajuste" title={customAdjustmentSummary(entry)}>
@@ -2875,7 +2936,7 @@ function Closing() {
       <div className="table-wrap closing-table-wrap">
         <table className="closing-table">
           <thead>
-            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Nota atual</th><th>Ausências</th><th>Dias atestado</th><th>Lançamentos</th><th>Assiduidade</th><th>Desconto</th><th>Bônus final</th><th></th></tr>
+            <tr><th>Funcionário</th><th>Cargo</th><th>Status</th><th>Nota / Pontos</th><th>Ausências</th><th>Dias atestado</th><th>Lançamentos</th><th>Assiduidade</th><th>Desconto</th><th>Bônus final</th><th></th></tr>
           </thead>
           <tbody>
             {closing.map((item) => (
@@ -2884,7 +2945,16 @@ function Closing() {
                   <td data-label="Funcionário">{item.funcionario}</td>
                   <td data-label="Cargo">{item.cargo}</td>
                   <td data-label="Status"><span className={item.elegivel ? "badge ok" : "badge danger"}>{item.status_mes === "Férias" ? "Férias" : item.elegivel ? "Elegível" : "Bloqueado"}</span></td>
-                  <td data-label="Nota atual">{item.nota_atual ?? "-"}</td>
+                  <td data-label="Nota / Pontos">
+                    {item.pontos_avaliacao != null ? (
+                      <span
+                        className={item.pontos_avaliacao >= EVALUATION_MIN_POINTS ? "badge ok" : "badge danger"}
+                        title={item.pontos_avaliacao >= EVALUATION_MIN_POINTS ? "Atingiu o mínimo para o variável" : `Abaixo de ${EVALUATION_MIN_POINTS} pontos: sem variável`}
+                      >
+                        {item.pontos_avaliacao}/{item.pontos_maximos}
+                      </span>
+                    ) : item.nota_atual ?? "-"}
+                  </td>
                   <td data-label="Ausências">{item.ausencias}</td>
                   <td data-label="Dias atestado">{item.dias_atestado || "-"}</td>
                   <td data-label="Lançamentos">{item.quantidade_lancamentos}</td>
@@ -2974,8 +3044,12 @@ function Rules() {
     {
       title: "Nota de desempenho",
       icon: Star,
-      text: "A nota atual aplica um multiplicador sobre a bonificação calculada no período.",
-      values: ["5: 100%", "4: 90%", "3: 80%", "2: 50%", "1: 20%"],
+      text: "Cada critério recebe uma nota de 1 a 5 no mês (vale a mais recente). A soma vai até 25 pontos; com 18 pontos ou mais o funcionário recebe o variável, abaixo disso fica só com a assiduidade.",
+      values: [
+        "Manhã e tarde: inventário/acuracidade, recebimento, perdas por avarias, comportamental, produtividade",
+        "Noite: sistemas e processos, comportamental, acuracidade, verificação das NFs, produtividade",
+        "Mínimo: 18 de 25 pontos (70%)",
+      ],
     },
     {
       title: "Penalidade",

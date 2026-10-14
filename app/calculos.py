@@ -114,6 +114,32 @@ def calcular_bonus(
     return round(base * fator, 2)
 
 
+CRITERIOS_AVALIACAO_TURNO_AB = {
+    "acuracidade_estoque": "Inventário / acuracidade do estoque",
+    "recebimento": "Recebimento",
+    "perdas_avarias": "Perdas por avarias ou validade",
+    "comportamental": "Comportamental",
+    "produtividade": "Produtividade",
+}
+
+CRITERIOS_AVALIACAO_TURNO_C = {
+    "sistemas_processos": "Sistemas e processos",
+    "comportamental": "Comportamental",
+    "acuracidade_estoque": "Acuracidade do estoque",
+    "verificacao_nfs": "Verificação das informações e observações nas NFs",
+    "produtividade": "Produtividade",
+}
+
+PONTOS_MAXIMOS_AVALIACAO = 25
+PONTOS_MINIMOS_VARIAVEL = 18
+
+
+def criterios_avaliacao_do_turno(turno: str) -> dict[str, str]:
+    if normalizar_turno(turno) == "noite":
+        return CRITERIOS_AVALIACAO_TURNO_C
+    return CRITERIOS_AVALIACAO_TURNO_AB
+
+
 def fator_da_nota(nota: int | None) -> float:
     fatores = {
         5: 1.0,

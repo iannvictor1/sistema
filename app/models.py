@@ -34,6 +34,7 @@ class LancamentoSemanal(Base):
     entregas = Column(Integer, default=0)
     retornos = Column(Integer, default=0)
     nota = Column(Integer, default=3)
+    criterio_avaliacao = Column(String, nullable=True)
     penalidade = Column(Boolean, default=False)
     motivo_penalidade = Column(String, nullable=True)
     ajuste_personalizado_descricao = Column(String, nullable=True)

@@ -24,7 +24,14 @@ from .schemas import (
     DescontoFechamentoCreate,
     DescontoFechamentoResponse
 )
-from .calculos import calcular_bonus, calcular_bonus_mensal, calcular_bonus_recebimento_toneladas
+from .calculos import (
+    PONTOS_MAXIMOS_AVALIACAO,
+    PONTOS_MINIMOS_VARIAVEL,
+    calcular_bonus,
+    calcular_bonus_mensal,
+    calcular_bonus_recebimento_toneladas,
+    criterios_avaliacao_do_turno,
+)
 from .export_excel import exportar_fechamento_excel
 from datetime import date, timedelta
 from pathlib import Path
@@ -127,6 +134,7 @@ def garantir_colunas_lancamento():
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS numero_nota_fiscal TEXT"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS nota_fiscal_pdf TEXT"))
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS nota_fiscal_pdf_nome TEXT"))
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN IF NOT EXISTS criterio_avaliacao TEXT"))
             return
 
         if engine.dialect.name != "sqlite":
@@ -153,6 +161,8 @@ def garantir_colunas_lancamento():
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN nota_fiscal_pdf TEXT"))
         if "nota_fiscal_pdf_nome" not in colunas:
             conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN nota_fiscal_pdf_nome TEXT"))
+        if "criterio_avaliacao" not in colunas:
+            conn.execute(text("ALTER TABLE lancamentos_semanais ADD COLUMN criterio_avaliacao TEXT"))
 
 
 garantir_colunas_lancamento()
@@ -300,6 +310,7 @@ def nota_atual_lancamentos(lancamentos: list[LancamentoSemanal]) -> int | None:
     avaliacoes = [
         lancamento for lancamento in lancamentos
         if normalizar_texto(lancamento.tipo_lancamento) == "avaliacao_semanal"
+        and not lancamento.criterio_avaliacao
     ]
     if not avaliacoes:
         return None
@@ -313,6 +324,48 @@ def nota_atual_lancamentos(lancamentos: list[LancamentoSemanal]) -> int | None:
         ),
     )
     return lancamento_atual.nota
+
+
+def chave_lancamento_mais_recente(lancamento: LancamentoSemanal):
+    return (
+        lancamento.data_lancamento or date.min,
+        lancamento.data_registro or date.min,
+        lancamento.id or 0,
+    )
+
+
+def notas_por_criterio(lancamentos: list[LancamentoSemanal], funcionario: Funcionario) -> dict[str, int]:
+    criterios = criterios_avaliacao_do_turno(funcionario.turno)
+    mais_recentes: dict[str, LancamentoSemanal] = {}
+    for lancamento in lancamentos:
+        criterio = lancamento.criterio_avaliacao
+        if normalizar_texto(lancamento.tipo_lancamento) != "avaliacao_semanal" or criterio not in criterios:
+            continue
+        atual = mais_recentes.get(criterio)
+        if atual is None or chave_lancamento_mais_recente(lancamento) > chave_lancamento_mais_recente(atual):
+            mais_recentes[criterio] = lancamento
+    return {criterio: lancamento.nota for criterio, lancamento in mais_recentes.items()}
+
+
+def aplicar_regra_pontos(
+    lancamentos: list[LancamentoSemanal],
+    lancamentos_producao: list[LancamentoSemanal],
+    nota_atual: int | None,
+    funcionario: Funcionario,
+) -> tuple[list[LancamentoSemanal], int | None, int | None]:
+    """Retorna (lancamentos_producao, nota_calculo, pontos).
+
+    Meses sem notas por criterio seguem a regra antiga da nota unica.
+    Com notas por criterio, a soma precisa atingir o minimo para liberar o variavel.
+    """
+    notas = notas_por_criterio(lancamentos, funcionario)
+    if not notas:
+        return lancamentos_producao, nota_atual, None
+
+    pontos = sum(notas.values())
+    if pontos >= PONTOS_MINIMOS_VARIAVEL:
+        return lancamentos_producao, 5, pontos
+    return [], nota_atual, pontos
 
 
 def lancamento_conta_producao(lancamento: LancamentoSemanal) -> bool:
@@ -392,6 +445,15 @@ def exigir_usuario_nao_conferente(usuario: str | None):
             status_code=403,
             detail="Conferentes podem apenas confirmar os participantes do recebimento."
         )
+
+
+def validar_criterio_avaliacao(tipo_lancamento: str, criterio: str | None, funcionario: Funcionario) -> str | None:
+    if tipo_lancamento != "avaliacao_semanal":
+        return None
+    criterio = (criterio or "").strip()
+    if criterio not in criterios_avaliacao_do_turno(funcionario.turno):
+        raise HTTPException(status_code=400, detail="Escolha um tipo de nota valido para o turno do funcionario.")
+    return criterio
 
 
 def lancamento_corresponde_recebimento(lancamento: LancamentoSemanal, recebimento: RecebimentoToneladas) -> bool:
@@ -627,6 +689,8 @@ def criar_lancamento_semanal(
     if tipo_lancamento == "avaliacao_semanal" and lancamento.nota not in {1, 2, 3, 4, 5}:
         raise HTTPException(status_code=400, detail="Informe uma nota valida entre 1 e 5.")
 
+    criterio_avaliacao = validar_criterio_avaliacao(tipo_lancamento, lancamento.criterio_avaliacao, funcionario)
+
     if lancamento.penalidade and not lancamento.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
 
@@ -675,6 +739,7 @@ def criar_lancamento_semanal(
         entregas=lancamento.entregas,
         retornos=lancamento.retornos,
         nota=nota,
+        criterio_avaliacao=criterio_avaliacao,
         penalidade=lancamento.penalidade,
         motivo_penalidade=motivo_penalidade,
         ajuste_personalizado_descricao=lancamento.ajuste_personalizado_descricao,
@@ -947,6 +1012,8 @@ def editar_lancamento_semanal(
     if tipo_lancamento == "avaliacao_semanal" and dados.nota not in {1, 2, 3, 4, 5}:
         raise HTTPException(status_code=400, detail="Informe uma nota valida entre 1 e 5.")
 
+    criterio_avaliacao = validar_criterio_avaliacao(tipo_lancamento, dados.criterio_avaliacao, funcionario)
+
     if dados.penalidade and not dados.motivo_penalidade:
         raise HTTPException(status_code=400, detail="Informe o motivo da penalidade.")
 
@@ -986,6 +1053,7 @@ def editar_lancamento_semanal(
     lancamento.entregas = dados.entregas
     lancamento.retornos = dados.retornos
     lancamento.nota = nota
+    lancamento.criterio_avaliacao = criterio_avaliacao
     lancamento.penalidade = dados.penalidade
     lancamento.motivo_penalidade = dados.motivo_penalidade if dados.penalidade else None
     lancamento.ajuste_personalizado_descricao = dados.ajuste_personalizado_descricao
@@ -1411,20 +1479,23 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             if lancamento_conta_producao(lancamento)
         ]
 
+        nota_atual = nota_atual_lancamentos(lancamentos)
+        producao_calculo, nota_calculo, pontos_avaliacao = aplicar_regra_pontos(
+            lancamentos, lancamentos_producao, nota_atual, funcionario
+        )
+
         if status_mes == "Férias":
-            nota_atual = nota_atual_lancamentos(lancamentos)
             assiduidade = calcular_assiduidade_proporcional(dias_trabalhados)
             bonus_bruto = round(calcular_bonus_producao_mensal(
-                lancamentos_producao,
+                producao_calculo,
                 ausencias,
-                nota_atual,
+                nota_calculo,
                 funcionario
             ) + assiduidade, 2) if dias_trabalhados > 0 else 0.0
             elegivel = True
             ausencias = 0
         else:
-            nota_atual = nota_atual_lancamentos(lancamentos)
-            bonus_bruto = calcular_bonus_mensal(lancamentos_producao, ausencias, nota_atual, funcionario)
+            bonus_bruto = calcular_bonus_mensal(producao_calculo, ausencias, nota_calculo, funcionario)
             assiduidade = ASSIDUIDADE_MENSAL if ausencias == 0 else 0.0
             elegivel = ausencias == 0
 
@@ -1442,6 +1513,8 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             "dias_atestado": dias_atestado,
             "quantidade_lancamentos": len(lancamentos_producao),
             "nota_atual": nota_atual,
+            "pontos_avaliacao": pontos_avaliacao,
+            "pontos_maximos": PONTOS_MAXIMOS_AVALIACAO,
             "bonus_bruto": bonus_bruto,
             "desconto": desconto,
             "motivo_desconto": motivo_desconto,
@@ -1495,12 +1568,15 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
             if lancamento_conta_producao(lancamento)
         ]
         nota_atual = nota_atual_lancamentos(lancamentos_mes)
+        producao_calculo, nota_calculo, pontos_avaliacao = aplicar_regra_pontos(
+            lancamentos_mes, lancamentos_producao, nota_atual, funcionario
+        )
 
         if status_mes == "Férias":
             bonus_bruto_producao = calcular_bonus_producao_mensal(
-                lancamentos_producao,
+                producao_calculo,
                 ausencias,
-                nota_atual,
+                nota_calculo,
                 funcionario
             )
             assiduidade = calcular_assiduidade_proporcional(dias_trabalhados)
@@ -1509,8 +1585,7 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
             ausencias = 0
         
         else:
-            nota_atual = nota_atual_lancamentos(lancamentos_mes)
-            bonus_bruto = calcular_bonus_mensal(lancamentos_producao, ausencias, nota_atual, funcionario)
+            bonus_bruto = calcular_bonus_mensal(producao_calculo, ausencias, nota_calculo, funcionario)
             assiduidade = ASSIDUIDADE_MENSAL if ausencias == 0 else 0.0
             elegivel = ausencias == 0
 
@@ -1528,6 +1603,8 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
             "dias_atestado": dias_atestado,
             "quantidade_lancamentos": len(lancamentos_producao),
             "nota_atual": nota_atual,
+            "pontos_avaliacao": pontos_avaliacao,
+            "pontos_maximos": PONTOS_MAXIMOS_AVALIACAO,
             "bonus_bruto": bonus_bruto,
             "desconto": desconto,
             "motivo_desconto": motivo_desconto,

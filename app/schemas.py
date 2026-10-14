@@ -44,6 +44,7 @@ class LancamentoSemanalCreate(BaseModel):
     entregas: int = 0
     retornos: int = 0
     nota: int
+    criterio_avaliacao: str | None = None
     penalidade: bool = False
     motivo_penalidade: str | None = None
     ajuste_personalizado_descricao: str | None = None
@@ -85,6 +86,7 @@ class LancamentoSemanalResponse(BaseModel):
     entregas: int
     retornos: int
     nota: int
+    criterio_avaliacao: str | None = None
     penalidade: bool
     motivo_penalidade: str | None = None
     ajuste_personalizado_descricao: str | None = None
@@ -109,6 +111,7 @@ class LancamentoSemanalUpdate(BaseModel):
     entregas: int = 0
     retornos: int = 0
     nota: int
+    criterio_avaliacao: str | None = None
     penalidade: bool = False
     motivo_penalidade: str | None = None
     ajuste_personalizado_descricao: str | None = None

@@ -4,6 +4,24 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+from .calculos import CRITERIOS_AVALIACAO_TURNO_AB, CRITERIOS_AVALIACAO_TURNO_C
+
+ROTULOS_CRITERIOS_AVALIACAO = {**CRITERIOS_AVALIACAO_TURNO_AB, **CRITERIOS_AVALIACAO_TURNO_C}
+
+
+def descricao_tipo_lancamento(lancamento, tipo: str) -> str:
+    criterio = getattr(lancamento, "criterio_avaliacao", None)
+    if criterio:
+        return f"{tipo} - {ROTULOS_CRITERIOS_AVALIACAO.get(criterio, criterio)}"
+    return tipo
+
+
+def descricao_nota_ou_pontos(item) -> str | int:
+    pontos = item.get("pontos_avaliacao")
+    if pontos is not None:
+        return f"{pontos}/{item.get('pontos_maximos', 25)}"
+    return item.get("nota_atual") or "-"
+
 
 def exportar_fechamento_excel(
     mes: str,
@@ -102,7 +120,7 @@ def exportar_fechamento_excel(
         "Qtd. Lançamentos",
         "Elegível",
         "Assiduidade",
-        "Nota Atual",
+        "Nota / Pontos",
         "Bonus Bruto",
         "Desconto",
         "Motivo Desconto",
@@ -136,7 +154,7 @@ def exportar_fechamento_excel(
         ws_resumo.cell(linha_atual, 7, item["quantidade_lancamentos"])
         ws_resumo.cell(linha_atual, 8, elegivel)
         ws_resumo.cell(linha_atual, 9, item["assiduidade"])
-        ws_resumo.cell(linha_atual, 10, item.get("nota_atual") or "-")
+        ws_resumo.cell(linha_atual, 10, descricao_nota_ou_pontos(item))
         ws_resumo.cell(linha_atual, 11, bonus_lancamentos)
         ws_resumo.cell(linha_atual, 12, item.get("desconto", 0))
         ws_resumo.cell(linha_atual, 13, item.get("motivo_desconto") or "-")
@@ -276,7 +294,7 @@ def exportar_fechamento_excel(
         ws_lanc.cell(linha, 2, l.funcionario_id)
         ws_lanc.cell(linha, 3, funcionarios_dict.get(l.funcionario_id, "-"))
         ws_lanc.cell(linha, 4, l.semana)
-        ws_lanc.cell(linha, 5, tipo)
+        ws_lanc.cell(linha, 5, descricao_tipo_lancamento(l, tipo))
         ws_lanc.cell(linha, 6, getattr(l, "data_registro", None))
         ws_lanc.cell(linha, 7, getattr(l, "data_lancamento", None))
         usuario_que_lancou, usuario_que_escolheu = usuarios_lancamento(l)
