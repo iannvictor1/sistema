@@ -88,6 +88,12 @@ def _render_lancamento_mensal(API_URL: str, funcionarios: list[dict]):
             key="lanc_mensal_pedidos_sep"
         )
     elif filtro_turno == "Noite":
+        pedidos_sep = st.number_input(
+            "Total de pedidos separados no mês",
+            min_value=0,
+            value=0,
+            key="lanc_mensal_pedidos_sep"
+        )
         pedidos_car = st.number_input(
             "Total de pedidos carregados no mês",
             min_value=0,
@@ -259,9 +265,17 @@ def render_lancamento(API_URL: str):
                     key="lanc_nota"
                 )
         elif turno_funcionario == "Noite":
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
 
             with col1:
+                pedidos_sep = st.number_input(
+                    "Pedidos separados",
+                    min_value=0,
+                    value=0,
+                    key="lanc_pedidos_sep"
+                )
+
+            with col2:
                 pedidos_car = st.number_input(
                     "Pedidos carregados",
                     min_value=0,
@@ -269,7 +283,7 @@ def render_lancamento(API_URL: str):
                     key="lanc_pedidos_car"
                 )
 
-            with col2:
+            with col3:
                 nota = st.selectbox(
                     "Nota",
                     [1, 2, 3, 4, 5],

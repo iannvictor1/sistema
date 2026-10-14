@@ -71,7 +71,7 @@ def calcular_bonus(
         or "toneladas" in criterios_adicionados
     )
     usar_pedidos_separados = "pedidos_separados" not in criterios_removidos and (
-        (not funcionario_entrega and (turno_sem_regra or turno_normalizado == "tarde"))
+        (not funcionario_entrega and (turno_sem_regra or turno_normalizado in {"tarde", "noite"}))
         or "pedidos_separados" in criterios_adicionados
     )
     usar_pedidos_carregados = "pedidos_carregados" not in criterios_removidos and (

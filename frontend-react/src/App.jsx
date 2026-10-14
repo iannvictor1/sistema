@@ -822,7 +822,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   }
 
   function isDefaultReceiptEmployee(employee) {
-    return isMorningEmployee(employee) && !isDeliveryEmployee(employee);
+    return ["manha", "tarde"].includes(normalizeText(employee?.turno)) && !isDeliveryEmployee(employee);
   }
 
   function receivesByTonnes(employee) {
@@ -1051,7 +1051,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     if (isCriterionRemoved(source, criterion)) return false;
     if (isCriterionAdded(source, criterion)) return true;
     if (criterion === "toneladas") return !isDelivery && employeeTurn === "manha";
-    if (criterion === "pedidos_separados") return !isDelivery && employeeTurn === "tarde";
+    if (criterion === "pedidos_separados") return !isDelivery && ["tarde", "noite"].includes(employeeTurn);
     if (criterion === "pedidos_carregados") return !isDelivery && employeeTurn === "noite";
     if (["entregas", "retornos"].includes(criterion)) return isDelivery;
     return false;
@@ -1800,7 +1800,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
           </select>
           )}
           <input type="date" value={form.data_lancamento} onChange={(event) => setForm({ ...form, data_lancamento: event.target.value })} />
-          {!isEvaluationEntry && bonusCriteria.map((criterion) => (
+          {!isEvaluationEntry && !isReceiptEntry && bonusCriteria.map((criterion) => (
             shouldShowCriterion(customEntryEnabled ? form : withoutCustomAdjustments(form), selectedEmployeeTurn, selectedEmployeeIsDelivery, criterion.id) && (
               <input
                 key={criterion.id}
@@ -1972,7 +1972,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
             />
           )}
 
-          {!monthlyIsDelivery && normalizeText(monthlyForm.filtro_turno) === "tarde" && (
+          {!monthlyIsDelivery && ["tarde", "noite"].includes(normalizeText(monthlyForm.filtro_turno)) && (
             <input
               min="0"
               type="number"
@@ -1982,7 +1982,6 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                 setMonthlyForm({
                   ...monthlyForm,
                   pedidos_separados: event.target.value,
-                  pedidos_carregados: 0,
                   toneladas: 0,
                 })
               }
@@ -1998,7 +1997,6 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
               onChange={(event) =>
                 setMonthlyForm({
                   ...monthlyForm,
-                  pedidos_separados: 0,
                   pedidos_carregados: event.target.value,
                   toneladas: 0,
                 })
@@ -2942,7 +2940,7 @@ function Rules() {
       title: "Regra por turno",
       icon: Clock,
       text: "A base de cálculo muda conforme o turno cadastrado para o funcionário.",
-      values: ["Manhã: R$ 2,00 por tonelada", "Tarde: R$ 0,10 por pedido separado", "Noite: R$ 0,10 por pedido carregado", "Horário comercial: apenas assiduidade"],
+      values: ["Manhã: R$ 2,00 por tonelada", "Tarde: R$ 0,10 por pedido separado", "Noite: R$ 0,10 por pedido separado e R$ 0,10 por pedido carregado", "Manhã e tarde entram por padrão no recebimento de toneladas", "Horário comercial: apenas assiduidade"],
     },
     {
       title: "Funcionários de entrega",
