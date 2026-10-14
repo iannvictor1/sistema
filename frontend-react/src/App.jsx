@@ -2377,6 +2377,7 @@ function Frequencies({ employees, frequencies, load }) {
     data_falta: todayInput(),
     tipo_falta: "Falta",
     dias_atestado: "",
+    cid: "",
     inicio_ferias: todayInput(),
     dias_ferias: "",
   });
@@ -2416,6 +2417,7 @@ function Frequencies({ employees, frequencies, load }) {
         day,
         type,
         String(frequency.dias_atestado || ""),
+        frequency.cid || "",
         frequency.inicio_ferias || "",
         String(frequency.dias_ferias || ""),
       ].some((value) => value.toLowerCase().includes(searchTerm));
@@ -2444,6 +2446,7 @@ function Frequencies({ employees, frequencies, load }) {
       data_falta: hasAbsence ? source.data_falta : null,
       tipo_falta: hasAbsence ? source.tipo_falta : null,
       dias_atestado: hasAbsence && source.tipo_falta === "Atestado" ? Number(source.dias_atestado || 0) : 0,
+      cid: hasAbsence && source.tipo_falta === "Atestado" ? source.cid.trim().toUpperCase() : null,
       status_mes: source.status_mes,
       inicio_ferias: hasVacation ? source.inicio_ferias : null,
       dias_ferias: hasVacation ? Number(source.dias_ferias || 0) : 0,
@@ -2471,6 +2474,7 @@ function Frequencies({ employees, frequencies, load }) {
       data_falta: frequency.data_falta || todayInput(),
       tipo_falta: frequency.tipo_falta || "Falta",
       dias_atestado: frequency.dias_atestado || "",
+      cid: frequency.cid || "",
       inicio_ferias: frequency.inicio_ferias || todayInput(),
       dias_ferias: frequency.dias_ferias || "",
     });
@@ -2588,6 +2592,15 @@ function Frequencies({ employees, frequencies, load }) {
                     required
                   />
                 )}
+                {editingFrequency.tipo_falta === "Atestado" && (
+                  <input
+                    maxLength={10}
+                    placeholder="CID"
+                    value={editingFrequency.cid}
+                    onChange={(event) => setEditingFrequency({ ...editingFrequency, cid: event.target.value.toUpperCase() })}
+                    required
+                  />
+                )}
               </>
             )}
           </>
@@ -2649,6 +2662,15 @@ function Frequencies({ employees, frequencies, load }) {
                     required
                   />
                 )}
+                {form.tipo_falta === "Atestado" && (
+                  <input
+                    maxLength={10}
+                    placeholder="CID"
+                    value={form.cid}
+                    onChange={(event) => setForm({ ...form, cid: event.target.value.toUpperCase() })}
+                    required
+                  />
+                )}
               </>
             )}
           </>
@@ -2705,7 +2727,7 @@ function Frequencies({ employees, frequencies, load }) {
       <div className="table-wrap">
         <table className="frequency-table">
           <thead>
-            <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th>Dias atestado</th><th>Início férias</th><th>Dias férias</th><th></th></tr>
+            <tr><th>ID</th><th>Funcionário</th><th>Mês</th><th>Status</th><th>Ausências</th><th>Dia</th><th>Tipo</th><th>Dias atestado</th><th>CID</th><th>Início férias</th><th>Dias férias</th><th></th></tr>
           </thead>
           <tbody>
             {filteredFrequencies.map((frequency) => (
@@ -2719,6 +2741,7 @@ function Frequencies({ employees, frequencies, load }) {
                   <td data-label="Dia">{frequency.data_falta || "-"}</td>
                   <td data-label="Tipo">{frequency.tipo_falta || "-"}</td>
                   <td data-label="Dias atestado">{frequency.dias_atestado || "-"}</td>
+                  <td data-label="CID">{frequency.cid || "-"}</td>
                   <td data-label="Início férias">{frequency.inicio_ferias || "-"}</td>
                   <td data-label="Dias férias">{frequency.dias_ferias || "-"}</td>
                   <td className="row-actions" data-label="Ações">
@@ -2744,7 +2767,7 @@ function Frequencies({ employees, frequencies, load }) {
 
                 {editingFrequency?.id === frequency.id && (
                   <tr className="inline-edit-row">
-                    <td colSpan="11">{renderFrequencyEditForm()}</td>
+                    <td colSpan="12">{renderFrequencyEditForm()}</td>
                   </tr>
                 )}
               </Fragment>
@@ -2752,7 +2775,7 @@ function Frequencies({ employees, frequencies, load }) {
 
             {!filteredFrequencies.length && (
               <tr>
-                <td className="empty-row" colSpan="11">Nenhum lançamento encontrado.</td>
+                <td className="empty-row" colSpan="12">Nenhum lançamento encontrado.</td>
               </tr>
             )}
           </tbody>
@@ -2933,8 +2956,8 @@ function Rules() {
     {
       title: "Assiduidade mensal",
       icon: CalendarCheck,
-      text: "Todo funcionário inicia o mês com o valor de assiduidade. Faltas removem o valor, e férias pagam proporcionalmente aos dias trabalhados.",
-      values: ["R$ 150,00 por mês", "Férias: R$ 150,00 / 30 x dias trabalhados"],
+      text: "Todo funcionário inicia o mês com o valor de assiduidade. Faltas removem o valor, e férias pagam proporcionalmente aos dias trabalhados. Atestado exige CID; um atestado no mês mantém o funcionário apto, o segundo o torna inapto.",
+      values: ["R$ 150,00 por mês", "Férias: R$ 150,00 / 30 x dias trabalhados", "Limite: 1 atestado com CID por mês"],
     },
     {
       title: "Regra por turno",

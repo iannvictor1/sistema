@@ -78,6 +78,7 @@ class FrequenciaMensal(Base):
     data_falta = Column(Date, nullable=True)
     tipo_falta = Column(String, nullable=True)
     dias_atestado = Column(Integer, default=0)
+    cid = Column(String, nullable=True)
     status_mes = Column(String, default="Normal")  
     inicio_ferias = Column(Date, nullable=True)
     dias_ferias = Column(Integer, default=0)

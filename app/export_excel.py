@@ -374,7 +374,7 @@ def exportar_fechamento_excel(
     # Aba 4 - Frequência Mensal (RESTAURADA)
     # =========================
     ws_freq = wb.create_sheet("Frequência Mensal")
-    ws_freq.merge_cells("A1:K1")
+    ws_freq.merge_cells("A1:L1")
     ws_freq["A1"] = "Controle de Frequência Mensal"
     ws_freq["A1"].font = fonte_titulo
     ws_freq["A1"].fill = fill_titulo
@@ -391,7 +391,8 @@ def exportar_fechamento_excel(
     "Dias de Atestado",
     "Status do Mês",
     "Inicio das Ferias",
-    "Dias de Ferias"
+    "Dias de Ferias",
+    "CID"
 ]
 
     for i, valor in enumerate(headers_freq, start=1):
@@ -416,14 +417,15 @@ def exportar_fechamento_excel(
         )
         ws_freq.cell(linha, 10, getattr(f, "inicio_ferias", None))
         ws_freq.cell(linha, 11, getattr(f, "dias_ferias", None) or 0)
+        ws_freq.cell(linha, 12, getattr(f, "cid", None) or "-")
 
-        for col in range(1, 12):
+        for col in range(1, 13):
             ws_freq.cell(linha, col).border = borda_fina
 
         linha += 1
 
     ws_freq.freeze_panes = "A4"
-    ws_freq.auto_filter.ref = f"A3:K{max(linha - 1, 3)}"
+    ws_freq.auto_filter.ref = f"A3:L{max(linha - 1, 3)}"
 
     ws_func = wb.create_sheet("Funcionários")
     ws_func.merge_cells("A1:E1")

@@ -63,6 +63,7 @@ def garantir_colunas_frequencia():
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS data_falta DATE"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS tipo_falta TEXT"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS dias_atestado INTEGER DEFAULT 0"))
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS cid TEXT"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS inicio_ferias DATE"))
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN IF NOT EXISTS dias_ferias INTEGER DEFAULT 0"))
             return
@@ -83,6 +84,8 @@ def garantir_colunas_frequencia():
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN tipo_falta TEXT"))
         if "dias_atestado" not in colunas:
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN dias_atestado INTEGER DEFAULT 0"))
+        if "cid" not in colunas:
+            conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN cid TEXT"))
         if "inicio_ferias" not in colunas:
             conn.execute(text("ALTER TABLE frequencias_mensais ADD COLUMN inicio_ferias DATE"))
         if "dias_ferias" not in colunas:
@@ -259,8 +262,22 @@ def calcular_bonus_producao_mensal(lancamentos, ausencias: int, nota_atual: int 
     return round(max(0.0, calcular_bonus_mensal(lancamentos, ausencias, nota_atual, funcionario) - ASSIDUIDADE_MENSAL), 2)
 
 
+LIMITE_ATESTADOS_MES = 1
+
+
+def ausencias_que_cortam_bonus(frequencias: list[FrequenciaMensal]) -> int:
+    atestados = [f for f in frequencias if f.tipo_falta == "Atestado" and (f.ausencias or 0) > 0]
+    outras = sum(f.ausencias or 0 for f in frequencias if f.tipo_falta != "Atestado")
+
+    # Ate um atestado por mes mantem o funcionario apto; a partir do segundo, todos contam.
+    if len(atestados) > LIMITE_ATESTADOS_MES:
+        outras += sum(f.ausencias or 0 for f in atestados)
+
+    return outras
+
+
 def resumir_frequencias(frequencias: list[FrequenciaMensal], mes: str) -> tuple[int, str, int]:
-    ausencias = sum(f.ausencias or 0 for f in frequencias)
+    ausencias = ausencias_que_cortam_bonus(frequencias)
 
     if ausencias > 0:
         return ausencias, "Normal", 0
@@ -1097,6 +1114,7 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         frequencia.data_falta = None
         frequencia.tipo_falta = None
         frequencia.dias_atestado = 0
+        frequencia.cid = None
         if not frequencia.inicio_ferias:
             raise HTTPException(status_code=400, detail="Informe a data de inicio das ferias.")
         if not frequencia.dias_ferias or frequencia.dias_ferias <= 0:
@@ -1109,8 +1127,12 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         if frequencia.tipo_falta == "Atestado":
             if not frequencia.dias_atestado or frequencia.dias_atestado <= 0:
                 raise HTTPException(status_code=400, detail="Informe a quantidade de dias do atestado.")
+            frequencia.cid = (frequencia.cid or "").strip().upper()
+            if not frequencia.cid:
+                raise HTTPException(status_code=400, detail="Informe o CID do atestado.")
         else:
             frequencia.dias_atestado = 0
+            frequencia.cid = None
         frequencia.mes = frequencia.data_falta.strftime("%Y-%m")
         frequencia.inicio_ferias = None
         frequencia.dias_ferias = 0
@@ -1118,20 +1140,27 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         frequencia.data_falta = None
         frequencia.tipo_falta = None
         frequencia.dias_atestado = 0
+        frequencia.cid = None
         frequencia.inicio_ferias = None
         frequencia.dias_ferias = 0
 
     exigir_funcionario_ativo(funcionario)
 
-    existente = (
+    consulta_existente = (
         db.query(FrequenciaMensal)
         .filter(
             FrequenciaMensal.funcionario_id == frequencia.funcionario_id,
             FrequenciaMensal.mes == frequencia.mes,
             FrequenciaMensal.data_falta == frequencia.data_falta
         )
-        .first()
     )
+    if frequencia.tipo_falta == "Atestado":
+        # Cada CID e um atestado distinto; so sobrescreve se for o mesmo atestado.
+        consulta_existente = consulta_existente.filter(
+            FrequenciaMensal.tipo_falta == "Atestado",
+            FrequenciaMensal.cid == frequencia.cid,
+        )
+    existente = consulta_existente.first()
 
     if existente:
         existente.ausencias = frequencia.ausencias
@@ -1139,6 +1168,7 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         existente.data_falta = frequencia.data_falta
         existente.tipo_falta = frequencia.tipo_falta
         existente.dias_atestado = frequencia.dias_atestado or 0
+        existente.cid = frequencia.cid
         existente.inicio_ferias = frequencia.inicio_ferias
         existente.dias_ferias = frequencia.dias_ferias or 0
 
@@ -1153,6 +1183,7 @@ def criar_frequencia(frequencia: FrequenciaMensalCreate, db: Session = Depends(g
         data_falta=frequencia.data_falta,
         tipo_falta=frequencia.tipo_falta,
         dias_atestado=frequencia.dias_atestado or 0,
+        cid=frequencia.cid,
         status_mes=frequencia.status_mes,
         inicio_ferias=frequencia.inicio_ferias,
         dias_ferias=frequencia.dias_ferias or 0
@@ -1200,6 +1231,7 @@ def editar_frequencia(
         dados.data_falta = None
         dados.tipo_falta = None
         dados.dias_atestado = 0
+        dados.cid = None
         if not dados.inicio_ferias:
             raise HTTPException(status_code=400, detail="Informe a data de inicio das ferias.")
         if not dados.dias_ferias or dados.dias_ferias <= 0:
@@ -1212,8 +1244,12 @@ def editar_frequencia(
         if dados.tipo_falta == "Atestado":
             if not dados.dias_atestado or dados.dias_atestado <= 0:
                 raise HTTPException(status_code=400, detail="Informe a quantidade de dias do atestado.")
+            dados.cid = (dados.cid or "").strip().upper()
+            if not dados.cid:
+                raise HTTPException(status_code=400, detail="Informe o CID do atestado.")
         else:
             dados.dias_atestado = 0
+            dados.cid = None
         dados.mes = dados.data_falta.strftime("%Y-%m")
         dados.inicio_ferias = None
         dados.dias_ferias = 0
@@ -1221,6 +1257,7 @@ def editar_frequencia(
         dados.data_falta = None
         dados.tipo_falta = None
         dados.dias_atestado = 0
+        dados.cid = None
         dados.inicio_ferias = None
         dados.dias_ferias = 0
 
@@ -1232,6 +1269,7 @@ def editar_frequencia(
     frequencia.data_falta = dados.data_falta
     frequencia.tipo_falta = dados.tipo_falta
     frequencia.dias_atestado = dados.dias_atestado or 0
+    frequencia.cid = dados.cid
     frequencia.status_mes = dados.status_mes
     frequencia.inicio_ferias = dados.inicio_ferias
     frequencia.dias_ferias = dados.dias_ferias or 0
