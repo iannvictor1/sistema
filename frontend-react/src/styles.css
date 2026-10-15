@@ -1081,14 +1081,16 @@ table {
   white-space: normal;
 }
 
+/* 11 colunas: Funcionário, Cargo, Status, Nota/Pontos, Ausências, Dias atestado,
+   Lançamentos, Assiduidade, Desconto, Bônus final, Ações */
 .closing-table th:nth-child(1),
 .closing-table td:nth-child(1) {
-  width: 27%;
+  width: 20%;
 }
 
 .closing-table th:nth-child(2),
 .closing-table td:nth-child(2) {
-  width: 18%;
+  width: 15%;
 }
 
 .closing-table th:nth-child(3),
@@ -1101,13 +1103,13 @@ table {
 .closing-table th:nth-child(5),
 .closing-table td:nth-child(5),
 .closing-table th:nth-child(6),
-.closing-table td:nth-child(6) {
+.closing-table td:nth-child(6),
+.closing-table th:nth-child(7),
+.closing-table td:nth-child(7) {
   text-align: center;
   width: 7%;
 }
 
-.closing-table th:nth-child(7),
-.closing-table td:nth-child(7),
 .closing-table th:nth-child(8),
 .closing-table td:nth-child(8),
 .closing-table th:nth-child(9),
@@ -1119,7 +1121,14 @@ table {
 .closing-table th:nth-child(10),
 .closing-table td:nth-child(10) {
   text-align: right;
-  width: 64px;
+  white-space: nowrap;
+  width: 10%;
+}
+
+.closing-table th:nth-child(11),
+.closing-table td:nth-child(11) {
+  text-align: right;
+  width: 56px;
 }
 
 .closing-table td:nth-child(1),
