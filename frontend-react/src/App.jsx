@@ -188,7 +188,7 @@ function useApiData() {
   const [error, setError] = useState("");
 
   async function load() {
-    setLoading(true);
+    // Nao liga o "Carregando" de novo: isso desmontava as telas e apagava os formularios.
     setError("");
     try {
       const [funcionarios, lancamentos, recebimentos, frequencias] = await Promise.all([
@@ -792,7 +792,6 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     toneladas: 0,
     entregas: 0,
     retornos: 0,
-    notas: {},
   });
 
   function normalizeText(value) {
@@ -1246,6 +1245,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         numero_nota_fiscal: "",
         nota_fiscal_pdf: null,
         nota_fiscal_pdf_nome: null,
+        criterio_avaliacao: "",
         ajustes_personalizados: [{ criterio: "pedidos_separados", operacao: "adicionar" }],
       }));
       setMessage(isEvaluationEntry ? "Nota salva." : `Lançamento salvo. Bônus: ${currency.format(Number(saved.bonus_calculado || 0))}`);
@@ -1269,13 +1269,6 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
       return;
     }
 
-    const notes = Object.fromEntries(
-      monthlyEmployees.map((employee) => [
-        employee.id,
-        Number(monthlyForm.notas[employee.id] || 5),
-      ]),
-    );
-
     try {
       const saved = await api.post("/lancamentos-mensais", {
         mes: monthlyForm.mes,
@@ -1287,10 +1280,17 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
         toneladas: monthlyIsDelivery || monthlyIsCommercialHours ? 0 : Number(monthlyForm.toneladas),
         entregas: monthlyIsCommercialHours ? 0 : Number(monthlyForm.entregas || 0),
         retornos: monthlyIsCommercialHours ? 0 : Number(monthlyForm.retornos || 0),
-        notas: notes,
       });
 
       await load();
+      setMonthlyForm((current) => ({
+        ...current,
+        pedidos_separados: 0,
+        pedidos_carregados: 0,
+        toneladas: 0,
+        entregas: 0,
+        retornos: 0,
+      }));
       setMessage(`Lançamento mensal salvo para ${saved.length} funcionário(s).`);
     } catch (err) {
       setMessage(errorMessage(err));
@@ -1991,7 +1991,6 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                 toneladas: 0,
                 entregas: 0,
                 retornos: 0,
-                notas: {},
               })
             }
           >
@@ -2004,7 +2003,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
           <select
             value={monthlyForm.tipo_funcionario}
             onChange={(event) =>
-              setMonthlyForm({ ...monthlyForm, tipo_funcionario: event.target.value, notas: {} })
+              setMonthlyForm({ ...monthlyForm, tipo_funcionario: event.target.value })
             }
           >
             <option value="Funcionário normal">Funcionário normal</option>
@@ -2087,7 +2086,7 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
           <div className="table-wrap" style={{ gridColumn: "1 / -1" }}>
             <table className="monthly-table">
               <thead>
-                <tr><th>Funcionário</th><th>Cargo</th><th>Turno</th><th>Nota</th></tr>
+                <tr><th>Funcionário</th><th>Cargo</th><th>Turno</th></tr>
               </thead>
               <tbody>
                 {monthlyEmployees.map((employee) => (
@@ -2095,24 +2094,6 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
                     <td data-label="Funcionário">{employee.nome}</td>
                     <td data-label="Cargo">{employee.cargo}</td>
                     <td data-label="Turno">{employee.turno}</td>
-                    <td data-label="Nota">
-                      <select
-                        value={monthlyForm.notas[employee.id] || 5}
-                        onChange={(event) =>
-                          setMonthlyForm({
-                            ...monthlyForm,
-                            notas: {
-                              ...monthlyForm.notas,
-                              [employee.id]: event.target.value,
-                            },
-                          })
-                        }
-                      >
-                        {[1, 2, 3, 4, 5].map((note) => (
-                          <option key={note}>{note}</option>
-                        ))}
-                      </select>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -2519,6 +2500,7 @@ function Frequencies({ employees, frequencies, load }) {
     try {
       await api.post("/frequencias", frequencyPayload(form));
       await load();
+      setForm((current) => ({ ...current, dias_atestado: "", cid: "", dias_ferias: "" }));
       setMessage("Frequência salva.");
     } catch (err) {
       setMessage(errorMessage(err));

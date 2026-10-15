@@ -1098,9 +1098,8 @@ def criar_lancamento_mensal(
     criados = []
 
     for funcionario in funcionarios_aplicaveis:
-        nota = lancamento.notas.get(funcionario.id)
-        if nota not in {1, 2, 3, 4, 5}:
-            raise HTTPException(status_code=400, detail=f"Informe nota válida para {funcionario.nome}.")
+        # A avaliacao vem dos lancamentos de nota por criterio; aqui a producao entra cheia.
+        nota = 5
 
         bonus = calcular_bonus(
             tipo_entrega=funcionario.tipo_entrega,

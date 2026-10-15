@@ -63,7 +63,7 @@ class LancamentoMensalCreate(BaseModel):
     toneladas: float = 0
     entregas: int = 0
     retornos: int = 0
-    notas: dict[int, int]
+    notas: dict[int, int] = {}
 
 
 class LancamentoSemanalResponse(BaseModel):
