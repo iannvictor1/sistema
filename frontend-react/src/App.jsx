@@ -978,7 +978,9 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   const isNormalEntry = ["semanal", "diario"].includes(form.tipo_lancamento);
   const supervisorEntry = isSupervisorUser(loggedUser);
   const availableEntryEmployees = employees.filter((employee) => (
-    employee.ativo && (!isNormalEntry || !receivesByTonnes(employee) || supervisorEntry)
+    employee.ativo
+    && (!isNormalEntry || !receivesByTonnes(employee) || supervisorEntry)
+    && (!isEvaluationEntry || !isDeliveryEmployee(employee))
   ));
   const canCreateSupervisorEntries = isSupervisorUser(loggedUser);
   const canChooseReceiptParticipants = isExpeditionUser(loggedUser);
@@ -1149,7 +1151,10 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     setForm((current) => ({
       ...current,
       tipo_lancamento: type,
-      funcionario_id: nextIsNormalEntry && receivesByTonnes(currentEmployee) && !supervisorEntry ? "" : current.funcionario_id,
+      funcionario_id: (nextIsNormalEntry && receivesByTonnes(currentEmployee) && !supervisorEntry)
+        || (type === "avaliacao_semanal" && isDeliveryEmployee(currentEmployee))
+        ? ""
+        : current.funcionario_id,
       pedidos_separados: 0,
       pedidos_carregados: 0,
       toneladas: 0,
@@ -3020,7 +3025,7 @@ function Rules() {
     {
       title: "Funcionários de entrega",
       icon: Truck,
-      text: "Motoristas e ajudantes entram no mesmo grupo operacional para os lançamentos de entrega. Cada entrega aumenta o bônus e cada retorno desconta do valor.",
+      text: "Motoristas e ajudantes entram no mesmo grupo operacional para os lançamentos de entrega. Cada entrega aumenta o bônus e cada retorno desconta do valor. Eles não participam do sistema de notas: recebem o valor integral das entregas.",
       values: ["Motorista = Entrega", "Ajudante = Entrega", "+ R$ 0,30 por entrega", "- R$ 0,60 por retorno"],
     },
     {

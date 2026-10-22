@@ -31,6 +31,7 @@ from .calculos import (
     calcular_bonus_mensal,
     calcular_bonus_recebimento_toneladas,
     criterios_avaliacao_do_turno,
+    recebe_bonus_entrega,
 )
 from .export_excel import exportar_fechamento_excel
 from datetime import date, timedelta
@@ -355,9 +356,13 @@ def aplicar_regra_pontos(
 ) -> tuple[list[LancamentoSemanal], int | None, int | None]:
     """Retorna (lancamentos_producao, nota_calculo, pontos).
 
+    Funcionarios de entrega ficam fora do sistema de notas e recebem a producao cheia.
     Meses sem notas por criterio seguem a regra antiga da nota unica.
     Com notas por criterio, a soma precisa atingir o minimo para liberar o variavel.
     """
+    if recebe_bonus_entrega(funcionario.tipo_entrega):
+        return lancamentos_producao, 5, None
+
     notas = notas_por_criterio(lancamentos, funcionario)
     if not notas:
         return lancamentos_producao, nota_atual, None
@@ -450,6 +455,8 @@ def exigir_usuario_nao_conferente(usuario: str | None):
 def validar_criterio_avaliacao(tipo_lancamento: str, criterio: str | None, funcionario: Funcionario) -> str | None:
     if tipo_lancamento != "avaliacao_semanal":
         return None
+    if recebe_bonus_entrega(funcionario.tipo_entrega):
+        raise HTTPException(status_code=400, detail="Funcionarios de entrega nao recebem notas.")
     criterio = (criterio or "").strip()
     if criterio not in criterios_avaliacao_do_turno(funcionario.turno):
         raise HTTPException(status_code=400, detail="Escolha um tipo de nota valido para o turno do funcionario.")
@@ -1478,7 +1485,7 @@ def fechamento_mensal(mes: str, db: Session = Depends(get_db)):
             if lancamento_conta_producao(lancamento)
         ]
 
-        nota_atual = nota_atual_lancamentos(lancamentos)
+        nota_atual = None if recebe_bonus_entrega(funcionario.tipo_entrega) else nota_atual_lancamentos(lancamentos)
         producao_calculo, nota_calculo, pontos_avaliacao = aplicar_regra_pontos(
             lancamentos, lancamentos_producao, nota_atual, funcionario
         )
@@ -1566,7 +1573,7 @@ def exportar_excel_fechamento(mes: str, request: Request, db: Session = Depends(
             lancamento for lancamento in lancamentos_mes
             if lancamento_conta_producao(lancamento)
         ]
-        nota_atual = nota_atual_lancamentos(lancamentos_mes)
+        nota_atual = None if recebe_bonus_entrega(funcionario.tipo_entrega) else nota_atual_lancamentos(lancamentos_mes)
         producao_calculo, nota_calculo, pontos_avaliacao = aplicar_regra_pontos(
             lancamentos_mes, lancamentos_producao, nota_atual, funcionario
         )
