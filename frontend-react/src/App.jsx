@@ -161,6 +161,31 @@ const USERS = {
   iago: "Cemiago123@"
 };
 
+// Perfis de acesso. Espelha usuario_supervisor / usuario_conferente em app/main.py.
+const SUPERVISOR_USERS = ["admin", "iann", "valesca", "paulo", "romario", "gabriel", "junior", "iago"];
+const CONFERENTE_USERS = ["ronilson", "kayke", "rafael"];
+
+// Abas liberadas por perfil; perfis fora daqui veem todas.
+const PROFILE_TABS = {
+  conferente: ["lancamentos", "historico-lancamentos"],
+};
+
+function normalizeUser(user) {
+  return String(user || "").trim().toLowerCase();
+}
+
+function userProfile(user) {
+  const normalized = normalizeUser(user);
+  if (SUPERVISOR_USERS.includes(normalized)) return "supervisor";
+  if (CONFERENTE_USERS.includes(normalized)) return "conferente";
+  return "padrao";
+}
+
+function tabsForUser(user) {
+  const allowed = PROFILE_TABS[userProfile(user)];
+  return allowed ? tabs.filter((tab) => allowed.includes(tab.id)) : tabs;
+}
+
 function readLoggedUser() {
   const params = new URLSearchParams(window.location.search);
   const token = params.get("auth") || localStorage.getItem("bonificacao_auth");
@@ -220,6 +245,8 @@ export function App() {
   const [loggedUser, setLoggedUser] = useState(readLoggedUser);
   const [theme, setTheme] = useState(() => localStorage.getItem("bonificacao_theme") || "light");
   const data = useApiData();
+  const visibleTabs = tabsForUser(loggedUser);
+  const currentTab = visibleTabs.some((tab) => tab.id === activeTab) ? activeTab : visibleTabs[0]?.id;
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -258,11 +285,11 @@ export function App() {
         </div>
 
         <nav>
-          {tabs.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             return (
               <button
-                className={activeTab === tab.id ? "active" : ""}
+                className={currentTab === tab.id ? "active" : ""}
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 type="button"
@@ -279,7 +306,7 @@ export function App() {
         <header className="topbar">
           <div>
             <p>Sistema de bônus</p>
-            <h1>{tabs.find((tab) => tab.id === activeTab)?.label}</h1>
+            <h1>{tabs.find((tab) => tab.id === currentTab)?.label}</h1>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" onClick={data.load} title="Atualizar dados" type="button">
@@ -302,13 +329,13 @@ export function App() {
         {data.error && <div className="alert error">{data.error}</div>}
         {data.loading && <div className="alert">Carregando dados da API...</div>}
 
-        {!data.loading && activeTab === "dashboard" && <Dashboard {...data} />}
-        {!data.loading && activeTab === "funcionarios" && <Employees {...data} />}
-        {!data.loading && activeTab === "lancamentos" && <Entries {...data} mode="form" loggedUser={loggedUser} />}
-        {!data.loading && activeTab === "historico-lancamentos" && <Entries {...data} mode="history" loggedUser={loggedUser} />}
-        {!data.loading && activeTab === "frequencias" && <Frequencies {...data} />}
-        {!data.loading && activeTab === "fechamento" && <Closing {...data} />}
-        {!data.loading && activeTab === "regras" && <Rules />}
+        {!data.loading && currentTab === "dashboard" && <Dashboard {...data} />}
+        {!data.loading && currentTab === "funcionarios" && <Employees {...data} />}
+        {!data.loading && currentTab === "lancamentos" && <Entries {...data} mode="form" loggedUser={loggedUser} />}
+        {!data.loading && currentTab === "historico-lancamentos" && <Entries {...data} mode="history" loggedUser={loggedUser} />}
+        {!data.loading && currentTab === "frequencias" && <Frequencies {...data} />}
+        {!data.loading && currentTab === "fechamento" && <Closing {...data} />}
+        {!data.loading && currentTab === "regras" && <Rules />}
       </main>
     </div>
   );
@@ -803,11 +830,11 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
   }
 
   function isSupervisorUser(user) {
-    return ["admin", "iann", "valesca", "paulo", "romario", "gabriel", "junior", "iago"].includes(normalizeText(user));
+    return userProfile(user) === "supervisor";
   }
 
   function isExpeditionUser(user) {
-    return ["ronilson", "kayke", "rafael"].includes(normalizeText(user));
+    return userProfile(user) === "conferente";
   }
 
   function entryTypeLabel(type) {
@@ -1427,6 +1454,14 @@ function Entries({ employees, entries, receipts = [], load, mode = "all", logged
     const bonus = Number(entry.bonus_calculado || 0);
     const minBonus = minBonusFilter === "" ? null : Number(minBonusFilter);
     const maxBonus = maxBonusFilter === "" ? null : Number(maxBonusFilter);
+
+    // Conferente so enxerga os recebimentos em que ele escolheu os participantes.
+    if (
+      canChooseReceiptParticipants
+      && (entryType !== "recebimento_toneladas" || normalizeText(entry.usuario_lancamento) !== normalizeText(loggedUser))
+    ) {
+      return false;
+    }
 
     return (
       belongsToMonth(entry, month) &&

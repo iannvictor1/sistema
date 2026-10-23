@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -37,6 +37,7 @@ from .export_excel import exportar_fechamento_excel
 from datetime import date, timedelta
 from pathlib import Path
 import json
+import re
 import unicodedata
 import base64
 import binascii
@@ -442,6 +443,24 @@ def usuario_supervisor(usuario: str | None) -> bool:
 
 def usuario_conferente(usuario: str | None) -> bool:
     return normalizar_texto(usuario) in {"kayke", "ronilson", "rafael"}
+
+
+ROTA_PARTICIPANTES_RECEBIMENTO = re.compile(r"/recebimentos-toneladas/\d+/participantes/?")
+
+
+@app.middleware("http")
+async def restringir_perfil_conferente(request: Request, call_next):
+    # Conferente so le dados e confirma participantes do recebimento.
+    if (
+        request.method not in {"GET", "HEAD", "OPTIONS"}
+        and usuario_conferente(request.headers.get("X-Bonificacao-User"))
+        and not ROTA_PARTICIPANTES_RECEBIMENTO.fullmatch(request.url.path)
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Conferentes podem apenas confirmar os participantes do recebimento."},
+        )
+    return await call_next(request)
 
 
 def exigir_usuario_nao_conferente(usuario: str | None):
@@ -928,6 +947,16 @@ def confirmar_participantes_recebimento(
     funcionario_por_id = {funcionario.id: funcionario for funcionario in funcionarios}
     selecionados = set(funcionario_ids)
     lancamentos_atuais = lancamentos_do_recebimento(db, recebimento)
+
+    # Conferente so altera recebimentos ja distribuidos em que ele mesmo escolheu os participantes.
+    if usuario_conferente(usuario) and any(
+        normalizar_texto(lancamento.usuario_lancamento) != normalizar_texto(usuario)
+        for lancamento in lancamentos_atuais
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Este recebimento teve os participantes escolhidos por outro usuario."
+        )
 
     for lancamento in lancamentos_atuais:
         if lancamento.funcionario_id not in selecionados:
